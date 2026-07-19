@@ -1,0 +1,14 @@
+{
+  "candidate_ids": [
+    "CAND-001",
+    "CAND-002",
+    "CAND-003",
+    "CAND-004"
+  ],
+  "cdr_preservation_expected": true,
+  "igcraft_version": "not-installed-not-run",
+  "schema_version": "1.0.0",
+  "source_kind": "project_authored_synthetic_replay",
+  "tool_execution": "not_executed",
+  "warning": "Synthetic carriers for deterministic software testing only."
+}

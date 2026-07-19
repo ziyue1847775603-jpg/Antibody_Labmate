@@ -1,0 +1,12 @@
+{
+  "license_status": "No LightDock code, binary, or output is distributed in this fixture.",
+  "provider_capability": "replay_only",
+  "provider_contract": "LightDockProvider",
+  "provider_version": "not-executed-in-p0",
+  "schema_version": "1.0.0",
+  "score_direction": "lower_is_better",
+  "score_name": "synthetic_fixture_score",
+  "source_kind": "project_authored_synthetic_replay",
+  "tool_execution": "not_executed",
+  "warning": "Scores and poses are synthetic software-test values, not LightDock results."
+}

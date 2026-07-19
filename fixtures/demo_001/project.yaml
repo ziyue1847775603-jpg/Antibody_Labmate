@@ -1,0 +1,32 @@
+{
+  "antibody": {
+    "candidate_count": 4,
+    "h_cdr1": "GFTFSSYA",
+    "h_cdr2": "ISYDGSNK",
+    "h_cdr3": "ARDYGYFDY",
+    "l_cdr1": "QSISSY",
+    "l_cdr2": "AAS",
+    "l_cdr3": "QQYNNW",
+    "light_chain_type": "auto",
+    "numbering_scheme": "imgt",
+    "random_seed": 42
+  },
+  "antigen": {
+    "chains": [
+      "A"
+    ],
+    "docking_mode": "blind",
+    "file": "input/antigen.pdb",
+    "keep_cofactors": [],
+    "remove_hetero": true,
+    "remove_ions": true,
+    "remove_waters": true,
+    "source": "upload"
+  },
+  "backend": "replay",
+  "fixture_id": "demo_001",
+  "mode": "replay",
+  "rights_confirmed": true,
+  "schema_version": "1.0.0",
+  "source_type": "project_authored_synthetic"
+}

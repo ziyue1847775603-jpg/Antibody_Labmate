@@ -1,0 +1,13 @@
+candidate_id,pose_rank,pose_id,raw_score,score_name,score_direction,complex_path,provider,provider_version,source_kind,tool_execution
+CAND-001,1,CAND-001-POSE-001,-120.0,synthetic_fixture_score,lower_is_better,CAND-001/pose_001.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-001,2,CAND-001-POSE-002,-116.0,synthetic_fixture_score,lower_is_better,CAND-001/pose_002.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-001,3,CAND-001-POSE-003,-110.0,synthetic_fixture_score,lower_is_better,CAND-001/pose_003.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-002,1,CAND-002-POSE-001,-125.0,synthetic_fixture_score,lower_is_better,CAND-002/pose_001.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-002,2,CAND-002-POSE-002,-105.0,synthetic_fixture_score,lower_is_better,CAND-002/pose_002.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-002,3,CAND-002-POSE-003,-98.0,synthetic_fixture_score,lower_is_better,CAND-002/pose_003.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-003,1,CAND-003-POSE-001,-90.0,synthetic_fixture_score,lower_is_better,CAND-003/pose_001.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-003,2,CAND-003-POSE-002,-86.0,synthetic_fixture_score,lower_is_better,CAND-003/pose_002.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-003,3,CAND-003-POSE-003,-80.0,synthetic_fixture_score,lower_is_better,CAND-003/pose_003.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-004,1,CAND-004-POSE-001,-112.0,synthetic_fixture_score,lower_is_better,CAND-004/pose_001.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-004,2,CAND-004-POSE-002,-108.0,synthetic_fixture_score,lower_is_better,CAND-004/pose_002.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed
+CAND-004,3,CAND-004-POSE-003,-104.0,synthetic_fixture_score,lower_is_better,CAND-004/pose_003.pdb,lightdock,not-executed-in-p0,project_authored_synthetic_replay,not_executed

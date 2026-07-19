@@ -1,0 +1,10 @@
+{
+  "candidate_id": "CAND-002",
+  "cdr_plddt": 84.0,
+  "interface_pae": 12.0,
+  "iptm": 0.74,
+  "mean_plddt": 88.0,
+  "source_kind": "project_authored_synthetic_replay",
+  "tool_execution": "not_executed",
+  "warning": "Synthetic parser-test values; not ColabFold output."
+}

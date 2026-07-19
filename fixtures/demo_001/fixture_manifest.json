@@ -1,0 +1,81 @@
+{
+  "artifact_hashes": {
+    "LICENSE-CC0.txt": "46beed63cf27c0e207d6a66c79ccc464492fb80814bd0bc31768a13241c18460",
+    "README.md": "92cfc603138dd67d0d301956c04483d52f87e0c0592dbe1c044ea5f9a6ca5c8a",
+    "colabfold_output/CAND-001/ranked_1.pdb": "f8069b3367a34de428c15e55c8866fb6717305d26b02628947b8cdcd078f95e5",
+    "colabfold_output/CAND-001/scores.json": "49eef87a109e1f2a4539d314fc7b97efb29bc8d6f3d5be66bf4d148d50fe8948",
+    "colabfold_output/CAND-001/sequence_map.json": "1c175647f677e4f5402bef0ee7f76c31531b7ce3b4622543b640f0c9d82e0b3c",
+    "colabfold_output/CAND-002/ranked_1.pdb": "e1b49070a0f9c6bd706fbc4f49a9732e7e588a41b24b790fb313bc4965947208",
+    "colabfold_output/CAND-002/scores.json": "16011406c073652beed5b07c10fe74e300e5960dac7422372ca0a8e223858cb2",
+    "colabfold_output/CAND-002/sequence_map.json": "7516d7ad7cd7c0b8efda0abe9dca2c7e63c9c503653396fab3ca54585b66a6b6",
+    "colabfold_output/CAND-003/ranked_1.pdb": "1a43468c2d075c28894c39d92627201e6a2b11986c038fdfd0e2240fe2cb4d1f",
+    "colabfold_output/CAND-003/scores.json": "5af7559d70626579fa75278a6e3c285a711475f49dbe9b5d6f41cad4fc64ee12",
+    "colabfold_output/CAND-003/sequence_map.json": "99c336d99dc10de3784decd978fe91f24571470431c4f8e355446c732ed6201a",
+    "colabfold_output/CAND-004/ranked_1.pdb": "b6d4c51c66925ddb912c003aaa1c09d899ec29d99d22994540a7ee7e1dffbf67",
+    "colabfold_output/CAND-004/scores.json": "315413a818d9d51544032c4a378e81ef40fa441027b3de69b227d3a052965ca3",
+    "colabfold_output/CAND-004/sequence_map.json": "c7e8d680e08d344da4ff5b8b648d24b0a18ca8e2d5e511d55c3f88ead5c5d8d3",
+    "colabfold_output/structure_manifest.json": "45e593a2ae1c51b2f59f40273784f1f83c9e681c9a7fd83e200abb182f905089",
+    "colabfold_output/structure_metrics.csv": "530c41e7b5f81d8d0499d2d84bbb0391826487e7509b571e3e33ef98bfd2238b",
+    "docking_output/CAND-001/pose_001.pdb": "c6005824a4a908db592ce762468f1d6e5c5c8a7af0073d0255fbe723332f7a2b",
+    "docking_output/CAND-001/pose_002.pdb": "cf0da9e9a47d24f91a9c08b139581bff3f6df901625a7279f2fce75e3b6b030a",
+    "docking_output/CAND-001/pose_003.pdb": "3abd919af122747795f004aa902ed7faee157551b3a302cae5c55e8786235287",
+    "docking_output/CAND-002/pose_001.pdb": "e14a7c6474361f8c189bcc45efa47a374c6bb93d8cd88e77023e247c6d3190c2",
+    "docking_output/CAND-002/pose_002.pdb": "e5a74ddab3901dce00ede10fabea0a58b43d9ec717b5aab0074dc7694cb2217e",
+    "docking_output/CAND-002/pose_003.pdb": "966e769178e1ad7b1dcca362e150ac54e989d9d625757e56db105c5bf1e5e034",
+    "docking_output/CAND-003/pose_001.pdb": "a8f2b5da653dfdf755811bcbb99bf74e54decc448d15ae4ecd10ebf5d8a81b31",
+    "docking_output/CAND-003/pose_002.pdb": "230719d4769055a98bed2e16f25b7cef41e85768b84a5fdd6d0ae76560a84aad",
+    "docking_output/CAND-003/pose_003.pdb": "d7fe4d2eb192278c5d3f4ac986bb07c24d5cc0376ffce5a09c8e8e095ed6b4d9",
+    "docking_output/CAND-004/pose_001.pdb": "a9badb2bba57ceb02f2a9133862c9ff9478a44098b3d78aee3aa82fba5817273",
+    "docking_output/CAND-004/pose_002.pdb": "80c471a3316eb80e162c701f52f9926a04e72c304b8d9fb81a8295f25e94bd81",
+    "docking_output/CAND-004/pose_003.pdb": "c8c2453de8f848d80843419adc0acb7c4a5d76e24c77def856637d591a2e6231",
+    "docking_output/docking_manifest.json": "cadbeb9b2969ffadf35c69befcbeca8b9ca0522f88bb523cbb3b3d680ad1467d",
+    "docking_output/docking_scores.csv": "2e07838eb08cc6c877fe6d618cf2943582c3af2df1f19c48e9dfd94cb2c6f826",
+    "expected/golden.json": "66fddf5af8269fee10a8b9661c82f43baf146d466fae47261af5fc2e57787994",
+    "igcraft_output/candidates.fasta": "d87e1b192a49be4616ec56ac79c386537b2363ac45f8d60cfb506fb6896424e4",
+    "igcraft_output/candidates_regions.csv": "66e042ac0d7e5c7418738ad685cd0a030860f18226d9eac7c25d5320a41e1b2b",
+    "igcraft_output/generation_manifest.json": "654ac863530aa60718e7336ce43e39b052df9c389fe99c79212f5ee244a4223e",
+    "input/antigen.pdb": "3057b61ef8bcda42c79bb822b3307cb6c32b940f03011fa9ae84c21b493e6f03",
+    "project.yaml": "0efde3525a412bd638f1cb358e175bfc1022486bd0432d9ddc69d26e191b2bc8"
+  },
+  "created_at": "2026-07-19T00:00:00Z",
+  "default_docking_provider": "lightdock",
+  "fixture_id": "demo_001",
+  "input_hashes": {
+    "antibody_sha256": "44fe0cce8c28079c46d795cc6179cb7199e8acc4a7383a44a6d3e6352c496c25",
+    "antigen_sha256": "3057b61ef8bcda42c79bb822b3307cb6c32b940f03011fa9ae84c21b493e6f03",
+    "input_bundle_sha256": "640eb7969137a956590e35091c9d8a2e20cb900ef40a6346ea2e7483277e8002"
+  },
+  "provider_capability": "replay_only",
+  "rights": {
+    "author": "Antibody Labmate contributors",
+    "contains_patent_or_confidential_sequence": false,
+    "contains_third_party_binary": false,
+    "contains_third_party_tool_output": false,
+    "license": "CC0-1.0",
+    "redistribution_allowed": true
+  },
+  "schema_version": "1.0.0",
+  "title": "Project-authored synthetic Replay fixture",
+  "tool_provenance": {
+    "ColabFold": {
+      "execution": "not_executed",
+      "version": "not-installed-not-run"
+    },
+    "IgCraft": {
+      "execution": "not_executed",
+      "version": "not-installed-not-run"
+    },
+    "LightDock": {
+      "execution": "not_executed",
+      "version": "not-installed-not-run"
+    },
+    "PyMOL": {
+      "execution": "not_executed",
+      "version": "not-installed-not-run"
+    }
+  },
+  "warnings": [
+    "All sequences, coordinates, structure metrics, docking scores, and poses are synthetic.",
+    "The fixture validates software behavior only and has no biological interpretation."
+  ]
+}

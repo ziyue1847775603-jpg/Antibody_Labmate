@@ -1,0 +1,23 @@
+{
+  "candidate_order": [
+    "CAND-001",
+    "CAND-002",
+    "CAND-004",
+    "CAND-003"
+  ],
+  "interface_residue_row_count": 42,
+  "required_artifacts": [
+    "report.html",
+    "job.json",
+    "manifest.json",
+    "manifest.sha256",
+    "candidates.fasta",
+    "candidate_ranking.csv",
+    "interface_residues.csv"
+  ],
+  "required_report_markers": [
+    "REPLAY · FIXED HASH-VERIFIED DEMO · NOT LIVE COMPUTE",
+    "计算优先级排名",
+    "科学限制与使用声明"
+  ]
+}

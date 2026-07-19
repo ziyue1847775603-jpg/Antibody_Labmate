@@ -1,0 +1,3 @@
+CC0 1.0 Universal dedication notice
+
+To the extent possible under law, Antibody Labmate contributors have waived all copyright and related or neighboring rights to the synthetic demo_001 fixture. The fixture is provided without warranty. See https://creativecommons.org/publicdomain/zero/1.0/

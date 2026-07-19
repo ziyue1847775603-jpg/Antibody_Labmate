@@ -1,0 +1,746 @@
+{
+  "candidate_id": "CAND-001",
+  "chains": {
+    "H": {
+      "residues": [
+        {
+          "amino_acid": "E",
+          "insertion_code": "",
+          "pdb_residue_number": 1,
+          "region": "H-fwr1",
+          "sequence_position": 1
+        },
+        {
+          "amino_acid": "V",
+          "insertion_code": "",
+          "pdb_residue_number": 2,
+          "region": "H-fwr1",
+          "sequence_position": 2
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 3,
+          "region": "H-fwr1",
+          "sequence_position": 3
+        },
+        {
+          "amino_acid": "L",
+          "insertion_code": "",
+          "pdb_residue_number": 4,
+          "region": "H-fwr1",
+          "sequence_position": 4
+        },
+        {
+          "amino_acid": "V",
+          "insertion_code": "",
+          "pdb_residue_number": 5,
+          "region": "H-fwr1",
+          "sequence_position": 5
+        },
+        {
+          "amino_acid": "E",
+          "insertion_code": "",
+          "pdb_residue_number": 6,
+          "region": "H-fwr1",
+          "sequence_position": 6
+        },
+        {
+          "amino_acid": "A",
+          "insertion_code": "",
+          "pdb_residue_number": 7,
+          "region": "H-fwr1",
+          "sequence_position": 7
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 8,
+          "region": "H-fwr1",
+          "sequence_position": 8
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 9,
+          "region": "H-cdr1",
+          "sequence_position": 9
+        },
+        {
+          "amino_acid": "F",
+          "insertion_code": "",
+          "pdb_residue_number": 10,
+          "region": "H-cdr1",
+          "sequence_position": 10
+        },
+        {
+          "amino_acid": "T",
+          "insertion_code": "",
+          "pdb_residue_number": 11,
+          "region": "H-cdr1",
+          "sequence_position": 11
+        },
+        {
+          "amino_acid": "F",
+          "insertion_code": "",
+          "pdb_residue_number": 12,
+          "region": "H-cdr1",
+          "sequence_position": 12
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 13,
+          "region": "H-cdr1",
+          "sequence_position": 13
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 14,
+          "region": "H-cdr1",
+          "sequence_position": 14
+        },
+        {
+          "amino_acid": "Y",
+          "insertion_code": "",
+          "pdb_residue_number": 15,
+          "region": "H-cdr1",
+          "sequence_position": 15
+        },
+        {
+          "amino_acid": "A",
+          "insertion_code": "",
+          "pdb_residue_number": 16,
+          "region": "H-cdr1",
+          "sequence_position": 16
+        },
+        {
+          "amino_acid": "W",
+          "insertion_code": "",
+          "pdb_residue_number": 17,
+          "region": "H-fwr2",
+          "sequence_position": 17
+        },
+        {
+          "amino_acid": "V",
+          "insertion_code": "",
+          "pdb_residue_number": 18,
+          "region": "H-fwr2",
+          "sequence_position": 18
+        },
+        {
+          "amino_acid": "R",
+          "insertion_code": "",
+          "pdb_residue_number": 19,
+          "region": "H-fwr2",
+          "sequence_position": 19
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 20,
+          "region": "H-fwr2",
+          "sequence_position": 20
+        },
+        {
+          "amino_acid": "A",
+          "insertion_code": "",
+          "pdb_residue_number": 21,
+          "region": "H-fwr2",
+          "sequence_position": 21
+        },
+        {
+          "amino_acid": "P",
+          "insertion_code": "",
+          "pdb_residue_number": 22,
+          "region": "H-fwr2",
+          "sequence_position": 22
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 23,
+          "region": "H-fwr2",
+          "sequence_position": 23
+        },
+        {
+          "amino_acid": "K",
+          "insertion_code": "",
+          "pdb_residue_number": 24,
+          "region": "H-fwr2",
+          "sequence_position": 24
+        },
+        {
+          "amino_acid": "I",
+          "insertion_code": "",
+          "pdb_residue_number": 25,
+          "region": "H-cdr2",
+          "sequence_position": 25
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 26,
+          "region": "H-cdr2",
+          "sequence_position": 26
+        },
+        {
+          "amino_acid": "Y",
+          "insertion_code": "",
+          "pdb_residue_number": 27,
+          "region": "H-cdr2",
+          "sequence_position": 27
+        },
+        {
+          "amino_acid": "D",
+          "insertion_code": "",
+          "pdb_residue_number": 28,
+          "region": "H-cdr2",
+          "sequence_position": 28
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 29,
+          "region": "H-cdr2",
+          "sequence_position": 29
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 30,
+          "region": "H-cdr2",
+          "sequence_position": 30
+        },
+        {
+          "amino_acid": "N",
+          "insertion_code": "",
+          "pdb_residue_number": 31,
+          "region": "H-cdr2",
+          "sequence_position": 31
+        },
+        {
+          "amino_acid": "K",
+          "insertion_code": "",
+          "pdb_residue_number": 32,
+          "region": "H-cdr2",
+          "sequence_position": 32
+        },
+        {
+          "amino_acid": "R",
+          "insertion_code": "",
+          "pdb_residue_number": 33,
+          "region": "H-fwr3",
+          "sequence_position": 33
+        },
+        {
+          "amino_acid": "F",
+          "insertion_code": "",
+          "pdb_residue_number": 34,
+          "region": "H-fwr3",
+          "sequence_position": 34
+        },
+        {
+          "amino_acid": "T",
+          "insertion_code": "",
+          "pdb_residue_number": 35,
+          "region": "H-fwr3",
+          "sequence_position": 35
+        },
+        {
+          "amino_acid": "I",
+          "insertion_code": "",
+          "pdb_residue_number": 36,
+          "region": "H-fwr3",
+          "sequence_position": 36
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 37,
+          "region": "H-fwr3",
+          "sequence_position": 37
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 38,
+          "region": "H-fwr3",
+          "sequence_position": 38
+        },
+        {
+          "amino_acid": "D",
+          "insertion_code": "",
+          "pdb_residue_number": 39,
+          "region": "H-fwr3",
+          "sequence_position": 39
+        },
+        {
+          "amino_acid": "N",
+          "insertion_code": "",
+          "pdb_residue_number": 40,
+          "region": "H-fwr3",
+          "sequence_position": 40
+        },
+        {
+          "amino_acid": "A",
+          "insertion_code": "",
+          "pdb_residue_number": 41,
+          "region": "H-cdr3",
+          "sequence_position": 41
+        },
+        {
+          "amino_acid": "R",
+          "insertion_code": "",
+          "pdb_residue_number": 42,
+          "region": "H-cdr3",
+          "sequence_position": 42
+        },
+        {
+          "amino_acid": "D",
+          "insertion_code": "",
+          "pdb_residue_number": 43,
+          "region": "H-cdr3",
+          "sequence_position": 43
+        },
+        {
+          "amino_acid": "Y",
+          "insertion_code": "",
+          "pdb_residue_number": 44,
+          "region": "H-cdr3",
+          "sequence_position": 44
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 45,
+          "region": "H-cdr3",
+          "sequence_position": 45
+        },
+        {
+          "amino_acid": "Y",
+          "insertion_code": "",
+          "pdb_residue_number": 46,
+          "region": "H-cdr3",
+          "sequence_position": 46
+        },
+        {
+          "amino_acid": "F",
+          "insertion_code": "",
+          "pdb_residue_number": 47,
+          "region": "H-cdr3",
+          "sequence_position": 47
+        },
+        {
+          "amino_acid": "D",
+          "insertion_code": "",
+          "pdb_residue_number": 48,
+          "region": "H-cdr3",
+          "sequence_position": 48
+        },
+        {
+          "amino_acid": "Y",
+          "insertion_code": "",
+          "pdb_residue_number": 49,
+          "region": "H-cdr3",
+          "sequence_position": 49
+        },
+        {
+          "amino_acid": "W",
+          "insertion_code": "",
+          "pdb_residue_number": 50,
+          "region": "H-fwr4",
+          "sequence_position": 50
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 51,
+          "region": "H-fwr4",
+          "sequence_position": 51
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 52,
+          "region": "H-fwr4",
+          "sequence_position": 52
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 53,
+          "region": "H-fwr4",
+          "sequence_position": 53
+        },
+        {
+          "amino_acid": "T",
+          "insertion_code": "",
+          "pdb_residue_number": 54,
+          "region": "H-fwr4",
+          "sequence_position": 54
+        },
+        {
+          "amino_acid": "L",
+          "insertion_code": "",
+          "pdb_residue_number": 55,
+          "region": "H-fwr4",
+          "sequence_position": 55
+        },
+        {
+          "amino_acid": "V",
+          "insertion_code": "",
+          "pdb_residue_number": 56,
+          "region": "H-fwr4",
+          "sequence_position": 56
+        },
+        {
+          "amino_acid": "T",
+          "insertion_code": "",
+          "pdb_residue_number": 57,
+          "region": "H-fwr4",
+          "sequence_position": 57
+        }
+      ],
+      "sequence": "EVQLVEAGGFTFSSYAWVRQAPGKISYDGSNKRFTISQDNARDYGYFDYWGQGTLVT"
+    },
+    "L": {
+      "residues": [
+        {
+          "amino_acid": "D",
+          "insertion_code": "",
+          "pdb_residue_number": 1,
+          "region": "L-fwr1",
+          "sequence_position": 1
+        },
+        {
+          "amino_acid": "I",
+          "insertion_code": "",
+          "pdb_residue_number": 2,
+          "region": "L-fwr1",
+          "sequence_position": 2
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 3,
+          "region": "L-fwr1",
+          "sequence_position": 3
+        },
+        {
+          "amino_acid": "M",
+          "insertion_code": "",
+          "pdb_residue_number": 4,
+          "region": "L-fwr1",
+          "sequence_position": 4
+        },
+        {
+          "amino_acid": "T",
+          "insertion_code": "",
+          "pdb_residue_number": 5,
+          "region": "L-fwr1",
+          "sequence_position": 5
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 6,
+          "region": "L-fwr1",
+          "sequence_position": 6
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 7,
+          "region": "L-fwr1",
+          "sequence_position": 7
+        },
+        {
+          "amino_acid": "P",
+          "insertion_code": "",
+          "pdb_residue_number": 8,
+          "region": "L-fwr1",
+          "sequence_position": 8
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 9,
+          "region": "L-cdr1",
+          "sequence_position": 9
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 10,
+          "region": "L-cdr1",
+          "sequence_position": 10
+        },
+        {
+          "amino_acid": "I",
+          "insertion_code": "",
+          "pdb_residue_number": 11,
+          "region": "L-cdr1",
+          "sequence_position": 11
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 12,
+          "region": "L-cdr1",
+          "sequence_position": 12
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 13,
+          "region": "L-cdr1",
+          "sequence_position": 13
+        },
+        {
+          "amino_acid": "Y",
+          "insertion_code": "",
+          "pdb_residue_number": 14,
+          "region": "L-cdr1",
+          "sequence_position": 14
+        },
+        {
+          "amino_acid": "L",
+          "insertion_code": "",
+          "pdb_residue_number": 15,
+          "region": "L-fwr2",
+          "sequence_position": 15
+        },
+        {
+          "amino_acid": "A",
+          "insertion_code": "",
+          "pdb_residue_number": 16,
+          "region": "L-fwr2",
+          "sequence_position": 16
+        },
+        {
+          "amino_acid": "V",
+          "insertion_code": "",
+          "pdb_residue_number": 17,
+          "region": "L-fwr2",
+          "sequence_position": 17
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 18,
+          "region": "L-fwr2",
+          "sequence_position": 18
+        },
+        {
+          "amino_acid": "L",
+          "insertion_code": "",
+          "pdb_residue_number": 19,
+          "region": "L-fwr2",
+          "sequence_position": 19
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 20,
+          "region": "L-fwr2",
+          "sequence_position": 20
+        },
+        {
+          "amino_acid": "E",
+          "insertion_code": "",
+          "pdb_residue_number": 21,
+          "region": "L-fwr2",
+          "sequence_position": 21
+        },
+        {
+          "amino_acid": "R",
+          "insertion_code": "",
+          "pdb_residue_number": 22,
+          "region": "L-fwr2",
+          "sequence_position": 22
+        },
+        {
+          "amino_acid": "A",
+          "insertion_code": "",
+          "pdb_residue_number": 23,
+          "region": "L-cdr2",
+          "sequence_position": 23
+        },
+        {
+          "amino_acid": "A",
+          "insertion_code": "",
+          "pdb_residue_number": 24,
+          "region": "L-cdr2",
+          "sequence_position": 24
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 25,
+          "region": "L-cdr2",
+          "sequence_position": 25
+        },
+        {
+          "amino_acid": "F",
+          "insertion_code": "",
+          "pdb_residue_number": 26,
+          "region": "L-fwr3",
+          "sequence_position": 26
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 27,
+          "region": "L-fwr3",
+          "sequence_position": 27
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 28,
+          "region": "L-fwr3",
+          "sequence_position": 28
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 29,
+          "region": "L-fwr3",
+          "sequence_position": 29
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 30,
+          "region": "L-fwr3",
+          "sequence_position": 30
+        },
+        {
+          "amino_acid": "S",
+          "insertion_code": "",
+          "pdb_residue_number": 31,
+          "region": "L-fwr3",
+          "sequence_position": 31
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 32,
+          "region": "L-fwr3",
+          "sequence_position": 32
+        },
+        {
+          "amino_acid": "T",
+          "insertion_code": "",
+          "pdb_residue_number": 33,
+          "region": "L-fwr3",
+          "sequence_position": 33
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 34,
+          "region": "L-cdr3",
+          "sequence_position": 34
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 35,
+          "region": "L-cdr3",
+          "sequence_position": 35
+        },
+        {
+          "amino_acid": "Y",
+          "insertion_code": "",
+          "pdb_residue_number": 36,
+          "region": "L-cdr3",
+          "sequence_position": 36
+        },
+        {
+          "amino_acid": "N",
+          "insertion_code": "",
+          "pdb_residue_number": 37,
+          "region": "L-cdr3",
+          "sequence_position": 37
+        },
+        {
+          "amino_acid": "N",
+          "insertion_code": "",
+          "pdb_residue_number": 38,
+          "region": "L-cdr3",
+          "sequence_position": 38
+        },
+        {
+          "amino_acid": "W",
+          "insertion_code": "",
+          "pdb_residue_number": 39,
+          "region": "L-cdr3",
+          "sequence_position": 39
+        },
+        {
+          "amino_acid": "F",
+          "insertion_code": "",
+          "pdb_residue_number": 40,
+          "region": "L-fwr4",
+          "sequence_position": 40
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 41,
+          "region": "L-fwr4",
+          "sequence_position": 41
+        },
+        {
+          "amino_acid": "Q",
+          "insertion_code": "",
+          "pdb_residue_number": 42,
+          "region": "L-fwr4",
+          "sequence_position": 42
+        },
+        {
+          "amino_acid": "G",
+          "insertion_code": "",
+          "pdb_residue_number": 43,
+          "region": "L-fwr4",
+          "sequence_position": 43
+        },
+        {
+          "amino_acid": "T",
+          "insertion_code": "",
+          "pdb_residue_number": 44,
+          "region": "L-fwr4",
+          "sequence_position": 44
+        },
+        {
+          "amino_acid": "K",
+          "insertion_code": "",
+          "pdb_residue_number": 45,
+          "region": "L-fwr4",
+          "sequence_position": 45
+        },
+        {
+          "amino_acid": "V",
+          "insertion_code": "",
+          "pdb_residue_number": 46,
+          "region": "L-fwr4",
+          "sequence_position": 46
+        },
+        {
+          "amino_acid": "E",
+          "insertion_code": "",
+          "pdb_residue_number": 47,
+          "region": "L-fwr4",
+          "sequence_position": 47
+        }
+      ],
+      "sequence": "DIQMTQSPQSISSYLAVSLGERAASFSGSGSGTQQYNNWFGQGTKVE"
+    }
+  },
+  "mapping_verified": true,
+  "source_kind": "project_authored_synthetic_replay",
+  "tool_execution": "not_executed"
+}
