@@ -1,0 +1,15 @@
+[server]
+headless = true
+maxUploadSize = 2
+maxMessageSize = 5
+enableCORS = true
+enableXsrfProtection = true
+enableStaticServing = false
+
+[browser]
+gatherUsageStats = false
+
+[client]
+showErrorDetails = "none"
+showErrorLinks = false
+toolbarMode = "minimal"
