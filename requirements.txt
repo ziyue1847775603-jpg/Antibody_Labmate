@@ -1,0 +1,2 @@
+# Streamlit Community Cloud entrypoint. Runtime packages are fully pinned below.
+-r requirements-runtime.lock
