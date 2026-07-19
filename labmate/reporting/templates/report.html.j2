@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Antibody Labmate — {{ replay_label }} — {{ run_id }}</title>
+  <style>
+    :root { --ink:#182230; --muted:#607084; --line:#d9e1ea; --paper:#ffffff; --wash:#f4f7fa; --replay:#a11212; --accent:#155eef; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--wash); font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    .replay-banner { position:sticky; top:0; z-index:20; padding:10px 16px; color:#fff; background:var(--replay); text-align:center; font-weight:800; letter-spacing:.16em; box-shadow:0 2px 10px #0003; }
+    main { max-width:1180px; margin:24px auto 56px; padding:0 18px; }
+    header, section { background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:20px; margin:14px 0; }
+    h1 { margin:0 0 6px; font-size:28px; }
+    h2 { margin:0 0 14px; font-size:20px; }
+    h3 { margin:18px 0 8px; font-size:16px; }
+    p { margin:8px 0; }
+    .muted { color:var(--muted); }
+    .warning { border-left:5px solid #e78000; background:#fff6e8; padding:12px; margin:10px 0; }
+    .truth { border-left:5px solid var(--replay); background:#fff0f0; padding:12px; margin:10px 0; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+    .card { border:1px solid var(--line); border-radius:9px; padding:12px; background:#fbfcfe; }
+    .value { font-weight:700; word-break:break-word; }
+    .hash { font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+    .table-wrap { overflow-x:auto; margin:8px 0; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th, td { border:1px solid var(--line); padding:7px 8px; text-align:left; white-space:nowrap; }
+    th { background:#edf3f9; position:sticky; top:0; }
+    tr:nth-child(even) td { background:#fafcff; }
+    .tag { display:inline-block; padding:2px 7px; border-radius:999px; font-weight:700; background:#e7eefc; }
+    .tag-replay { background:#ffd8d8; color:#821010; }
+    footer { color:var(--muted); text-align:center; padding:18px; }
+    code { background:#eef2f6; padding:1px 4px; border-radius:4px; }
+    @media print { .replay-banner { position:static; } body { background:#fff; } main { max-width:none; margin:0; } section, header { break-inside:avoid; } }
+  </style>
+</head>
+<body>
+  <div class="replay-banner">REPLAY · FIXED HASH-VERIFIED DEMO · NOT LIVE COMPUTE</div>
+  <main>
+    <header id="run-summary">
+      <h1>Antibody Labmate — CDR-to-Docking Workflow</h1>
+      <p><span class="tag tag-replay">{{ replay_label }}</span> <span class="tag">{{ run_id }}</span></p>
+      <p class="muted">生成时间（UTC）：{{ created_at }}</p>
+      <div class="truth"><strong>真实性说明：</strong>S02–S06 读取经 SHA-256 校验的项目自建合成 fixture。此次运行没有执行 IgCraft、ColabFold、LightDock、ElliDock、HDOCK 或 PyMOL；解析、几何接触分析、启发式排名和本报告由本项目代码重新运行。</div>
+    </header>
+
+    <section id="input">
+      <h2>1. 输入 CDR 与抗原来源</h2>
+      <p>编号方案：<strong>{{ job.antibody.numbering_scheme }}</strong>；轻链设置：<strong>{{ job.antibody.light_chain_type }}</strong>；候选数：<strong>{{ job.antibody.candidate_count }}</strong>；seed：<strong>{{ job.antibody.random_seed }}</strong>。</p>
+      <div class="table-wrap"><table><thead><tr><th>IMGT region</th><th>合成 demo sequence</th></tr></thead><tbody>
+      {% for region, sequence in cdr_regions.items() %}<tr><td>{{ region }}</td><td class="hash">{{ sequence }}</td></tr>{% endfor %}
+      </tbody></table></div>
+      <div class="grid">
+        <div class="card"><div class="muted">抗原来源</div><div class="value">项目自建合成 PDB</div></div>
+        <div class="card"><div class="muted">所选链</div><div class="value">{{ antigen_summary.chains|join(', ') }}</div></div>
+        <div class="card"><div class="muted">原子 / 残基</div><div class="value">{{ antigen_summary.atom_count }} / {{ antigen_summary.residue_count }}</div></div>
+        <div class="card"><div class="muted">模型选择</div><div class="value">first MODEL = {{ antigen_summary.selected_model }}</div></div>
+      </div>
+      <p class="muted">六条短序列只能完成字符和 P0 安全长度校验，不能单独证明 IMGT 标注、框架、结构或生物学功能正确。</p>
+    </section>
+
+    <section id="mode">
+      <h2>2. 运行模式与计算位置</h2>
+      <p><strong>模式：</strong>REPLAY；<strong>后端：</strong>ReplayBackend；<strong>默认 DockingProvider 契约：</strong>LightDockProvider（<code>replay_only</code>）。</p>
+      <p>Live Local、Live Remote 均未实现、未验证、未启用。普通 DiffDock 不属于本工作流的抗体–抗原 docking 后端。</p>
+    </section>
+
+    <section id="stages">
+      <h2>3. 阶段状态与来源</h2>
+      <div class="table-wrap"><table><thead><tr><th>阶段</th><th>名称</th><th>状态</th><th>execution_kind</th><th>provider</th><th>说明</th></tr></thead><tbody>
+      {% for stage in stages %}<tr><td>{{ stage.stage_id }}</td><td>{{ stage.name }}</td><td>{{ stage.status }}</td><td>{{ stage.execution_kind }}</td><td>{{ stage.provider }}</td><td>{{ stage.notes|join('; ') }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+
+    <section id="generation">
+      <h2>4. 候选生成参数与序列 QC</h2>
+      <p>fixture 含 4 个项目自建合成 VH/VL carrier 结果；IgCraft 未运行。工作流重新检查六条 CDR 在每个候选 region 表中逐字符保留、候选 ID 唯一且序列只含标准残基。</p>
+    </section>
+
+    <section id="structure">
+      <h2>5. 结构质量（固定合成 fixture 指标）</h2>
+      <div class="truth">这些 pLDDT/PAE/ipTM 数值是用于测试 parser、归一化与报告的合成数据，不是 ColabFold 运行结果，也不证明结构真实。</div>
+      <div class="table-wrap"><table><thead><tr><th>Candidate</th><th>mean pLDDT</th><th>CDR pLDDT</th><th>interface PAE</th><th>ipTM</th><th>两链</th></tr></thead><tbody>
+      {% for row in structure_rows %}<tr><td>{{ row.candidate_id }}</td><td>{{ row.mean_plddt }}</td><td>{{ row.cdr_plddt }}</td><td>{{ row.interface_pae }}</td><td>{{ row.iptm }}</td><td>{{ row.has_both_chains }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+
+    <section id="docking">
+      <h2>6. Docking provider 原始分数（固定合成 fixture）</h2>
+      <div class="truth">LightDock 未执行。表中 <code>synthetic_fixture_score</code> 只验证 LightDockProvider 的统一输出契约与方向处理，不能称为对接能、亲和力或结合自由能。</div>
+      <div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Pose</th><th>Raw score</th><th>Direction</th><th>Provider version</th><th>Source</th></tr></thead><tbody>
+      {% for row in docking_rows %}<tr><td>{{ row.candidate_id }}</td><td>{{ row.pose_rank }}</td><td>{{ row.raw_score }}</td><td>{{ row.score_direction }}</td><td>{{ row.provider_version }}</td><td>{{ row.source_kind }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+
+    <section id="ranking">
+      <h2>7. 计算优先级排名</h2>
+      <p><code>FinalScore = 0.35 × StructureScore + 0.45 × DockingScore + 0.20 × InterfaceScore</code>。全部子指标先按声明方向在同一次运行内 min–max 到 0–100；常量指标统一记 50；缺失可选指标在子分组内重分配权重。</p>
+      <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Candidate</th><th>Structure</th><th>Docking</th><th>Interface</th><th>Final</th><th>Pose 数</th><th>Clash-free</th></tr></thead><tbody>
+      {% for row in ranking_rows %}<tr><td>{{ row.rank }}{% if row.is_tied %} (tie){% endif %}</td><td>{{ row.candidate_id }}</td><td>{{ row.structure_score }}</td><td>{{ row.docking_score }}</td><td>{{ row.interface_score }}</td><td>{{ row.final_score }}</td><td>{{ row.pose_count }}</td><td>{{ row.clash_free_ratio }}</td></tr>{% endfor %}
+      </tbody></table></div>
+
+      <h3>权重敏感性</h3>
+      <div class="table-wrap"><table><thead><tr><th>Scenario</th><th>S/D/I weights</th><th>Rank</th><th>Candidate</th><th>Final</th></tr></thead><tbody>
+      {% for row in sensitivity_rows %}<tr><td>{{ row.scenario }}</td><td>{{ row.structure_weight }} / {{ row.docking_weight }} / {{ row.interface_weight }}</td><td>{{ row.rank }}</td><td>{{ row.candidate_id }}</td><td>{{ row.final_score }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+
+    <section id="interface">
+      <h2>8. 界面残基与 Pose 共识</h2>
+      <p>距离阈值：contact 4.5 Å、polar heuristic 3.5 Å、ionic heuristic 4.0 Å、severe clash 2.0 Å。距离命中没有供体–氢–受体角度，因此不会标作“已形成氢键”。</p>
+      <div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Pose</th><th>Ab residue</th><th>Region</th><th>Ag residue</th><th>Min Å</th><th>Types</th><th>Frequency</th><th>CDR</th><th>Clash</th></tr></thead><tbody>
+      {% for row in interface_rows %}<tr><td>{{ row.candidate_id }}</td><td>{{ row.pose_rank }}</td><td>{{ row.antibody_chain }}:{{ row.antibody_residue_number }} {{ row.antibody_residue_name }}</td><td>{{ row.antibody_region }}</td><td>{{ row.antigen_chain }}:{{ row.antigen_residue_number }} {{ row.antigen_residue_name }}</td><td>{{ row.min_distance_angstrom }}</td><td>{{ row.interaction_types }}</td><td>{{ row.pose_frequency }}/{{ row.pose_frequency_denominator }}</td><td>{{ row.is_cdr_contact }}</td><td>{{ row.has_severe_clash }}</td></tr>{% endfor %}
+      </tbody></table></div>
+      <h3>Pose 共识摘要</h3>
+      <div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Poses</th><th>Unique pairs</th><th>CDR ratio</th><th>Consensus</th><th>Clash-free</th><th>Unmapped</th></tr></thead><tbody>
+      {% for row in consensus_rows %}<tr><td>{{ row.candidate_id }}</td><td>{{ row.poses_analyzed }}</td><td>{{ row.unique_contact_pairs }}</td><td>{{ row.cdr_contact_ratio }}</td><td>{{ row.pose_consensus }}</td><td>{{ row.clash_free_ratio }}</td><td>{{ row.unmapped_contacts }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+
+    <section id="visualization">
+      <h2>9. 可选结构图</h2>
+      <p>状态：<code>skipped_optional</code>。PyMOL 未调用；没有用占位图伪装结构渲染。Complex PDB 仍包含在 ZIP 中。</p>
+    </section>
+
+    <section id="provenance">
+      <h2>10. 版本、哈希与产物</h2>
+      <div class="grid">
+        {% for name, value in input_hashes.items() %}<div class="card"><div class="muted">{{ name }}</div><div class="value hash">{{ value }}</div></div>{% endfor %}
+        <div class="card"><div class="muted">fixture_manifest_sha256</div><div class="value hash">{{ fixture_manifest_hash }}</div></div>
+      </div>
+      <h3>Artifact preview</h3>
+      <div class="table-wrap"><table><thead><tr><th>Relative path</th><th>SHA-256</th><th>Role</th></tr></thead><tbody>
+      {% for item in artifact_preview %}<tr><td>{{ item.path }}</td><td class="hash">{{ item.sha256 }}</td><td>{{ item.role }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+
+    <section id="licenses">
+      <h2>11. 第三方许可证与外部服务披露</h2>
+      <ul>
+        <li>本项目自有代码：MIT。</li>
+        <li>Streamlit：Apache-2.0；Pydantic：MIT；Jinja2：BSD-3-Clause；pytest：MIT（测试依赖）。</li>
+        <li>LightDock：GPL-3.0，但本包不包含、不安装、不执行 LightDock；只保留 provider contract 与项目自建合成 Replay schema。</li>
+        <li>IgCraft、ColabFold、ElliDock、HDOCK、PyMOL：未打包、未调用、未产生本报告数据。</li>
+        <li>此次 Replay 不访问网络，也不向第三方服务发送序列或结构。</li>
+      </ul>
+    </section>
+
+    <section id="warnings">
+      <h2>12. 警告、失败与重试</h2>
+      {% if warnings %}{% for warning in warnings %}<div class="warning">{{ warning }}</div>{% endfor %}{% else %}<p>无运行失败；S09 为明确的 optional skip。</p>{% endif %}
+    </section>
+
+    <section id="limitations">
+      <h2>13. 科学限制与使用声明</h2>
+      <div class="warning"><strong>{{ scientific_limitation }}</strong></div>
+      <p>Demo fixture 的序列、坐标与所有数值专为软件测试而合成，不是实验结果，不代表任何真实抗体–抗原体系，也不得跨抗原或跨后端解释其绝对值。</p>
+    </section>
+    <footer>Antibody Labmate Phase 1 Replay MVP · Offline report · {{ replay_label }}</footer>
+  </main>
+</body>
+</html>
