@@ -2,6 +2,8 @@
 
 > **REPLAY ONLY · FIXED HASH-VERIFIED DEMO · NOT LIVE COMPUTE**
 
+🌐 **Live Replay Demo:** [Open Antibody Labmate](https://antibodylabmate-jxifsgmgfipzdh7nrx3wdz.streamlit.app/)
+
 这是按照《Antibody Labmate 最终执行路线 v1.1》实现的 Phase 1 Replay MVP。它接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行 Replay。运行时会重新完成 PDB 解析、候选/结构/docking 固定输出解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。
 
 本版本不会安装、调用或模拟 IgCraft、ColabFold、LightDock、ElliDock、HDOCK、PyMOL 或远程 worker。Live Local 与 Live Remote 均为 `unavailable`。
