@@ -72,3 +72,26 @@ artifact is rejected. Public deployment does not turn this release into a Live
 service and should not be presented as one. Do not upload confidential or
 third-party-controlled sequences to a public demo.
 
+## Public deployment verification
+
+- Verified by: jadecity800
+- Verification date: 2026-07-20
+- Deployment platform: Streamlit Community Cloud
+- Python version: 3.11
+- Branch: `main`
+- Entrypoint: `app.py`
+- Public URL: https://antibodylabmate-jxifsgmgfipzdh7nrx3wdz.streamlit.app/
+
+### Verification results
+
+- Public access without GitHub login: Passed
+- Application homepage loaded successfully: Passed
+- Replay fixture loaded successfully: Passed
+- Replay workflow completed successfully: Passed
+- Candidate ranking displayed: Passed
+- Interface residue table displayed: Passed
+- Offline HTML report downloaded successfully: Passed
+
+### Scope
+
+This verification covers the synthetic Replay demonstration only. Live Local and Live Remote computation remain unavailable.
