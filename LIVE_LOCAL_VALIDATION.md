@@ -1,0 +1,217 @@
+# Phase 2a Live Local validation
+
+Date: 2026-07-27  
+Final status: **`verified_live` (bounded software-integration scope)**
+
+`verified_live` means that the exact local pipeline and configuration below
+completed with real ColabFold and LightDock executions and passed independent
+artifact checks. It does **not** validate binding, affinity, binding free
+energy, specificity, safety, efficacy, developability, or any experimental
+conclusion.
+
+## Source and repository state
+
+- Supplied source ZIP SHA-256:
+  `d844c41975b37bc7603e0179e1d12a7916c4e8ef97da4ddd796492989d90f8e7`
+- The SHA matched before extraction. All 100 archive entries passed the safe
+  path check, and the original ZIP was not modified.
+- The extracted source did not contain Git metadata. The workspace `.git`
+  directory contained no valid repository metadata, so a truthful `git
+  status` was not available. No user Git changes were overwritten or deleted.
+- The project version after validation is `0.2.0`.
+
+## Machine and external tools
+
+| Item | Observed value |
+|---|---|
+| Host | Windows 11 24H2, build 26100 |
+| WSL | WSL2, Ubuntu 26.04, kernel 6.18.33.2 |
+| GPU | NVIDIA GeForce RTX 5070 Ti Laptop GPU, 12,227 MiB |
+| NVIDIA driver / WSL CUDA report | 591.91 / CUDA 13.1 |
+| Project Python | 3.11.15 |
+| Conda | 26.5.3 |
+| ColabFold | 1.6.2 (`alphafold-colabfold` 2.3.18) |
+| LightDock | 0.9.4, GPL-3.0, separately installed |
+| PyMOL | Not found; `skipped_optional` |
+
+The real executable locations were:
+
+```text
+/root/miniconda3/envs/colabfold/bin/colabfold_batch
+/mnt/d/my-project/external-tools/lightdock-0.9.4/bin/lightdock3_setup.py
+/mnt/d/my-project/external-tools/lightdock-0.9.4/bin/lightdock3.py
+/mnt/d/my-project/external-tools/lightdock-0.9.4/bin/lgd_generate_conformations.py
+```
+
+The LightDock environment is outside the MIT source tree and is excluded from
+the release ZIP. No LightDock source, binary, environment, or dependency is
+bundled with Antibody Labmate.
+
+## MSA and model-network decision
+
+The installed ColabFold default is `mmseqs2_uniref_env` with
+`https://api.colabfold.com`; installed code contains the HTTP POST path that
+would submit a query sequence. That default was inspected but **never run**.
+
+Every executed smoke run instead used:
+
+```text
+--msa-mode single_sequence
+--data /mnt/d/colabfold-data/models
+--model-type alphafold2_multimer_v3
+--num-models 1
+--num-recycle 1
+--disable-unified-memory
+--compile-mode fast
+```
+
+The application verified all five multimer-v3 parameter files before starting.
+It did not download models. The resulting ColabFold `config.json` retains the
+program's unused default `host_url` field, but `msa_mode` is
+`single_sequence`, the A3M contains only the two input chains, the log contains
+no MSA query stage, and no public MSA service was used. No sequence was
+uploaded by this application.
+
+## Synthetic smoke input and parameters
+
+The input is project-authored deterministic synthetic data under CC0-1.0. It
+does not contain a patent example, confidential sequence, IgCraft output, or a
+Replay calculation presented as Live output.
+
+| Input | SHA-256 |
+|---|---|
+| Complete VH/VL FASTA | `4411041490ae514ccbf71a8959135b9d9de5bd32653bb6d0fc12774354742d68` |
+| Region CSV | `c9ee134179fc8de95be1dd2d961840e17bc3c1f9272602400a515b2c4d408f82` |
+| Single-chain antigen PDB | `3057b61ef8bcda42c79bb822b3307cb6c32b940f03011fa9ae84c21b493e6f03` |
+
+The region CSV has seven ordered regions per chain; each H/L concatenation is
+an exact character-for-character match to its FASTA sequence.
+
+Docking parameters:
+
+```text
+candidates=1
+steps=20
+swarms=4
+glowworms=50
+cores=2
+top_poses=3
+scoring=fastdfire
+score_direction=higher_is_better
+```
+
+Installed LightDock 0.9.4 defines `fastdfire` as the default and its scoring
+ranking sorts in descending order (`reverse=True`). Thus
+`higher_is_better` is supported by the exact installed implementation, not
+guessed. It is meaningful only within this run and scoring configuration.
+
+## Actual command and final run
+
+The exact command was:
+
+```bash
+cd /mnt/d/my-project/antibody-labmate
+.venv311/bin/labmate run \
+  /mnt/d/my-project/live-local-smoke-run/project.json \
+  --mode live_local \
+  --output /mnt/d/my-project/antibody-labmate-validation-runs
+```
+
+Final run ID: **`RUN-20260727-004729-3afe82ca`**
+
+## Independent output checks
+
+- Raw ColabFold chains A/B exactly matched the 112-aa VH and 110-aa VL.
+  Normalized chains H/L retained the exact sequences, residue numbers,
+  insertion codes, residue names, coordinates, occupancies, and B-factors.
+- All 222 residue pLDDT values in the score JSON matched PDB B-factors.
+  Independently recomputed mean pLDDT was `27.8397`; CDR pLDDT was `28.5804`.
+  These low synthetic-smoke values are not scientific validation.
+- Four `gso_20.out` files contained 50 data rows each (200 solutions total).
+  The global higher-is-better top three were:
+
+  1. swarm 2, 0-based GSO row/glowworm ID 18, score `7.97317969`;
+  2. swarm 3, row/ID 42, score `7.13793176`;
+  3. swarm 1, row/ID 49, score `6.98778249`.
+
+- Each selected source row was materialized into an explicit three-line
+  selected GSO in ranking order. The generator's line index was mapped to
+  `lightdock_0.pdb`, `lightdock_1.pdb`, and `lightdock_2.pdb`; filenames were
+  never sorted to infer scores.
+- All three poses had exactly A/H/L chains and exact antigen/VH/VL sequence,
+  residue-number, insertion-code, and residue-name contracts.
+- Interface analysis processed 3/3 poses. `pose_consensus.csv` records
+  `poses_analyzed=3`.
+- Ranking contains one candidate, so every min-max normalized component and
+  final heuristic score is 50. It has no between-candidate discriminatory
+  meaning.
+- All 72 manifest artifacts matched their recorded size and SHA-256. All 74
+  run-ZIP members matched the run directory byte-for-byte.
+- The final HTML shows all required stages as `succeeded`, except S09 PyMOL as
+  `skipped_optional`; its S10 state agrees with the manifest.
+- Binary/text privacy scanning found no local absolute path, username, token,
+  secret, API key, password, actual environment-variable name/value, or
+  environment dump in the report, logs, manifest, or ZIP.
+
+## Final artifact hashes
+
+| Artifact | SHA-256 |
+|---|---|
+| `candidate_ranking.csv` | `8c8b173048cd676b878ea7d5e532cc2e0f0ed145b57f6db8ca6430d36e12d55b` |
+| `interface_residues.csv` | `f2db52321ab5e7006752efb236fb5a4ca4d08160a3c3174ba06e55dcd875d374` |
+| `report.html` | `cc196ce6059afc2570a80462caec6747807d35306e9532a6a3bd3c3b0d53a52a` |
+| `manifest.json` | `f5c253aa733516e219454870c5a985c4347098eb45031c7e93bba05c0dcb552c` |
+| Run ZIP | `109db1f3269d5129a355904d1e7185300c13c6dd53a43742678869d820f95880` |
+
+## Failures found and fixes applied
+
+1. The supplied test suite initially had one Windows failure because a POSIX
+   absolute path was accepted on Windows. Path validation now rejects POSIX
+   and Windows absolute paths on either host.
+2. LightDock 0.9.4 installation first encountered an interrupted PyPI transfer,
+   NumPy 2.x incompatibility in old C extensions, and GCC 15 treating an old
+   pointer warning as an error. It was installed only in the separate conda
+   prefix using NumPy 1.26.4, no build isolation, and a one-build warning
+   override. No system package was installed and no LightDock code was edited.
+3. An inline preflight attempt had shell quoting syntax failure; it executed no
+   scientific tool. A checked Python preflight script replaced it.
+4. The first ColabFold run
+   (`RUN-20260726-144307-65823985`) exhausted WSL unified memory. The adapter
+   stopped because no official rank-001 PDB existed and did not fabricate any
+   downstream output. The retry used ColabFold's
+   `--disable-unified-memory --compile-mode fast`.
+5. The first complete run
+   (`RUN-20260726-144530-4fb0bf99`) exposed four audit defects: only 2/3 poses
+   were analyzed, HTML rendered S10 as `running`, Live stage names still said
+   `artifact replay`, and a JAX warning retained an environment-variable name.
+   Code and regression tests were corrected, and the full computation was
+   rerun rather than editing old artifacts.
+6. Windows release packaging attempted to traverse the WSL venv `lib64`
+   symlink before applying exclusions. Directory traversal now prunes excluded
+   environments first while still rejecting any symlink in release scope.
+
+## Regression results
+
+- Windows Python 3.11.15: **76 passed**.
+- WSL Python 3.11.15: **76 passed**.
+- Final Replay CLI run:
+  `RUN-20260727-005240-dd6f1e51`; 10 stages `succeeded`, S09
+  `skipped_optional`, every stage `execution_kind=replay`, 78 artifact hashes
+  verified, run ZIP SHA-256
+  `02f96b6f2889fc9ad1a64fde0a766d14c3c6388bdf45293a53358e06ecd692df`.
+- Streamlit headless startup: health endpoint returned HTTP 200 / `ok`; the
+  process was then stopped.
+
+## Not validated
+
+- IgCraft execution inside the application;
+- public or local MSA-backed ColabFold modes, templates, other model/tool
+  versions, larger batches, performance, or reproducibility across machines;
+- other LightDock scoring functions or production-scale docking;
+- Live Remote, authentication, isolation, cancellation, timeout, retention, or
+  cleanup services;
+- PyMOL rendering (not installed; correctly `skipped_optional`);
+- ElliDock, HDOCK, Schrödinger, or any other docking provider;
+- experimental or clinical meaning of any structure, score, contact, or rank.
+
+Within this explicit boundary, the current state is **`verified_live`**.

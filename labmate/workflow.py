@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import platform
+import re
 import shutil
 import uuid
 import zipfile
@@ -72,14 +73,20 @@ def _parse_fasta(path: Path) -> dict[str, dict[str, str]]:
             continue
         if line.startswith(">"):
             if current is not None:
+                if current in records:
+                    raise FixtureIntegrityError(f"FASTA 标题重复: {current}")
                 records[current] = "".join(chunks)
             current = line[1:].strip()
+            if not current:
+                raise FixtureIntegrityError(f"FASTA 第 {line_number} 行标题为空")
             chunks = []
         elif current is None:
             raise FixtureIntegrityError(f"FASTA 第 {line_number} 行缺少标题")
         else:
             chunks.append(line.upper())
     if current is not None:
+        if current in records:
+            raise FixtureIntegrityError(f"FASTA 标题重复: {current}")
         records[current] = "".join(chunks)
     candidates: dict[str, dict[str, str]] = {}
     for header, sequence in records.items():
@@ -87,12 +94,16 @@ def _parse_fasta(path: Path) -> dict[str, dict[str, str]]:
             candidate_id, chain_name = header.split("|", 1)
         except ValueError as exc:
             raise FixtureIntegrityError(f"FASTA 标题格式无效: {header}") from exc
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", candidate_id):
+            raise FixtureIntegrityError(f"FASTA candidate ID 不安全: {candidate_id!r}")
         chain = {"VH": "H", "VL": "L"}.get(chain_name)
         if chain is None:
             raise FixtureIntegrityError(f"FASTA 链标签无效: {chain_name}")
         if not sequence or set(sequence) - STANDARD_AMINO_ACIDS:
             raise FixtureIntegrityError(f"{header} 含空序列或非法残基")
-        candidates.setdefault(candidate_id, {})[chain] = sequence
+        if chain in candidates.setdefault(candidate_id, {}):
+            raise FixtureIntegrityError(f"FASTA 候选链重复: {candidate_id}|{chain_name}")
+        candidates[candidate_id][chain] = sequence
     if not candidates or any(set(chains) != {"H", "L"} for chains in candidates.values()):
         raise FixtureIntegrityError("每个候选必须同时包含 VH 与 VL")
     if len({(chains["H"], chains["L"]) for chains in candidates.values()}) != len(candidates):
@@ -169,7 +180,7 @@ def _copy_tree(source: Path, destination: Path) -> list[Path]:
     return [path for path in destination.rglob("*") if path.is_file()]
 
 
-def _artifact_role(relative: Path) -> str:
+def _artifact_role(relative: Path, *, execution_mode: str = "replay") -> str:
     if relative.name == "report.html":
         return "offline_report"
     if relative.name == "candidate_ranking.csv":
@@ -181,25 +192,49 @@ def _artifact_role(relative: Path) -> str:
     if relative.parts[0] == "inputs":
         return "validated_input"
     if relative.parts[0] == "docking":
-        return "replay_docking_artifact"
+        return (
+            "replay_docking_artifact"
+            if execution_mode == "replay"
+            else "live_local_docking_artifact"
+        )
     if relative.parts[0] == "structures":
-        return "replay_structure_artifact"
+        return (
+            "replay_structure_artifact"
+            if execution_mode == "replay"
+            else "live_local_structure_artifact"
+        )
     if relative.parts[0] == "analysis":
-        return "local_replay_analysis"
+        return (
+            "local_replay_analysis"
+            if execution_mode == "replay"
+            else "local_live_analysis"
+        )
     if relative.parts[0] == "ranking":
-        return "local_replay_ranking"
+        return (
+            "local_replay_ranking"
+            if execution_mode == "replay"
+            else "local_live_ranking"
+        )
     if relative.parts[0] == "logs":
         return "run_log"
     return "run_artifact"
 
 
-def _collect_artifacts(run_dir: Path) -> list[ArtifactRecord]:
+def _collect_artifacts(
+    run_dir: Path, *, execution_mode: str = "replay"
+) -> list[ArtifactRecord]:
     records: list[ArtifactRecord] = []
     for path in sorted(run_dir.rglob("*")):
         if not path.is_file() or path.name in {"manifest.json", "manifest.sha256"}:
             continue
         relative = path.relative_to(run_dir)
-        records.append(artifact_record(path, run_dir, role=_artifact_role(relative)))
+        records.append(
+            artifact_record(
+                path,
+                run_dir,
+                role=_artifact_role(relative, execution_mode=execution_mode),
+            )
+        )
     return records
 
 
@@ -524,7 +559,7 @@ def execute_replay(*, job: JobSpec, antigen_bytes: bytes, fixture_root: Path, ou
                 name="Live Local",
                 status=CapabilityStatus.UNAVAILABLE,
                 enabled=False,
-                reason="Phase 2 is not implemented or end-to-end verified.",
+                reason="This Replay run does not invoke Live Local; the separate local CLI adapter has its own verified_live validation scope.",
             ),
             "live_remote": Capability(
                 name="Live Remote",
@@ -551,7 +586,7 @@ def execute_replay(*, job: JobSpec, antigen_bytes: bytes, fixture_root: Path, ou
         limitations=[
             SCIENTIFIC_LIMITATION,
             "All demo sequences, coordinates, confidence metrics, docking scores, and poses are synthetic test data.",
-            "No Live Local or Live Remote capability is implemented or verified in Phase 1.",
+            "This Replay run did not invoke Live Local or Live Remote; Live Local has a separate CLI validation record.",
             "CDR syntax validation cannot prove IMGT annotation, framework compatibility, folding, or binding.",
             "Ranking is a within-run product heuristic, not a calibrated biological predictor.",
         ],

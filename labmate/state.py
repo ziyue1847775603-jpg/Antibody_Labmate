@@ -21,23 +21,45 @@ STAGES: tuple[tuple[str, str], ...] = (
     ("S10", "Reporting"),
 )
 
+LIVE_LOCAL_STAGES: tuple[tuple[str, str], ...] = (
+    ("S00", "Job initialization"),
+    ("S01", "Input validation"),
+    ("S02", "Candidate input transfer"),
+    ("S03", "Sequence quality control"),
+    ("S04", "Local structure prediction"),
+    ("S05", "Structure quality control"),
+    ("S06", "Local docking"),
+    ("S07", "Interface analysis"),
+    ("S08", "Candidate ranking"),
+    ("S09", "Visualization"),
+    ("S10", "Reporting"),
+)
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
 class StageStateMachine:
-    def __init__(self, *, fixture_id: str, fixture_manifest_hash: str) -> None:
+    def __init__(
+        self,
+        *,
+        fixture_id: str | None = None,
+        fixture_manifest_hash: str | None = None,
+        execution_kind: ExecutionKind = ExecutionKind.REPLAY,
+        provider: str = "ReplayBackend",
+        stages: tuple[tuple[str, str], ...] = STAGES,
+    ) -> None:
         self.records = [
             StageRecord(
                 stage_id=stage_id,
                 name=name,
-                execution_kind=ExecutionKind.REPLAY,
-                provider="ReplayBackend",
+                execution_kind=execution_kind,
+                provider=provider,
                 fixture_id=fixture_id,
                 fixture_manifest_hash=fixture_manifest_hash,
             )
-            for stage_id, name in STAGES
+            for stage_id, name in stages
         ]
 
     def _record(self, stage_id: str) -> StageRecord:
@@ -95,4 +117,3 @@ class StageStateMachine:
         record.ended_at = utc_now()
         record.error = error
         return record
-

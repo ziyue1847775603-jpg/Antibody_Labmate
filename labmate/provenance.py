@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import mimetypes
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from labmate.errors import FixtureIntegrityError
@@ -51,10 +51,17 @@ def build_input_hashes(job: JobSpec, antigen_bytes: bytes) -> dict[str, str]:
 def safe_relative_path(path: str) -> Path:
     if not path or path.startswith("./") or "\\" in path or "\x00" in path:
         raise FixtureIntegrityError(f"不安全的相对路径: {path!r}")
-    candidate = Path(path)
-    if candidate.is_absolute() or not candidate.parts or any(part in {"", ".", ".."} for part in candidate.parts):
+    posix = PurePosixPath(path)
+    windows = PureWindowsPath(path)
+    if (
+        posix.is_absolute()
+        or windows.is_absolute()
+        or windows.drive
+        or not posix.parts
+        or any(part in {"", ".", ".."} for part in posix.parts)
+    ):
         raise FixtureIntegrityError(f"不安全的相对路径: {path!r}")
-    return candidate
+    return Path(*posix.parts)
 
 
 def artifact_record(path: Path, run_root: Path, *, role: str, media_type: str | None = None) -> ArtifactRecord:

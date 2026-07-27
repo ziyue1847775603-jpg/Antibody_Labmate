@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.2.0 — Phase 2a Live Local (2026-07-27)
+
+- Added a CLI-only `--mode live_local` execution path for user-installed ColabFold and LightDock commands.
+- Added paired VH/VL FASTA plus exact region CSV input validation, PDB chain normalization, command logs, local interface analysis, ranking, HTML report, provenance manifest, and an input template.
+- Completed and independently audited a one-candidate WSL2 end-to-end smoke run with ColabFold 1.6.2 (`single_sequence`, preinstalled multimer-v3 weights) and separately installed LightDock 0.9.4. The bounded software-integration status is `verified_live`; exact evidence and limitations are in `LIVE_LOCAL_VALIDATION.md`.
+- Added fail-closed network/model policy, exact VH/VL chain and residue mapping, PDB B-factor/score-JSON pLDDT cross-checks, explicit global GSO row-to-pose mapping, all-selected-pose interface analysis, metadata redaction, privacy auditing, and real-format regression tests.
+- LightDock remains an external GPL-3.0 program and is not bundled; the application did not use a public MSA service or download model weights in the validation run.
+- Streamlit Community Cloud remains Replay-only; Live Remote remains unavailable.
+
 ## v0.1.1 — Submission Hardening (2026-07-19)
 
 > **REPLAY ONLY · FIXED HASH-VERIFIED DEMO · NOT LIVE COMPUTE**
@@ -44,4 +53,3 @@ test pass.
   included.
 - Scores are synthetic software-test values and do not establish binding,
   affinity, specificity, safety, or therapeutic effect.
-

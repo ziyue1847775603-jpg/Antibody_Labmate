@@ -1,4 +1,4 @@
-"""Command-line entry point for the Replay-only MVP."""
+"""Command-line entry point for Replay and explicitly marked Live Local runs."""
 
 from __future__ import annotations
 
@@ -12,9 +12,11 @@ from pydantic import ValidationError
 
 from labmate import __version__
 from labmate.backends.replay import ReplayBackend
+from labmate.backends.local import LiveLocalBackend
 from labmate.docking.registry import capability_matrix
 from labmate.errors import LabmateError
 from labmate.workflow import load_project
+from labmate.live_local import load_live_local_project
 
 
 def project_root() -> Path:
@@ -33,13 +35,13 @@ def fixture_path(fixture_id: str) -> Path:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="labmate", description="Antibody Labmate Phase 1 Replay MVP")
+    parser = argparse.ArgumentParser(prog="labmate", description="Antibody Labmate")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
-    run = subcommands.add_parser("run", help="run the exact verified Replay demo")
+    run = subcommands.add_parser("run", help="run Replay or the user-installed Live Local pipeline")
     run.add_argument("project", type=Path, help="JSON-compatible project.yaml")
-    run.add_argument("--mode", choices=["replay"], default="replay")
+    run.add_argument("--mode", choices=["replay", "live_local"], default="replay")
     run.add_argument("--fixture", default="demo_001")
     run.add_argument("--output", type=Path, default=Path("runs"))
 
@@ -53,15 +55,22 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "capabilities":
             print(json.dumps(capability_matrix(), ensure_ascii=False, indent=2))
             return 0
-        job, antigen_bytes = load_project(args.project)
-        if job.fixture_id != args.fixture:
-            raise LabmateError("project fixture_id 与 --fixture 不一致")
-        backend = ReplayBackend(fixture_path(args.fixture))
-        result = backend.submit(job, antigen_bytes, args.output)
+        if args.mode == "replay":
+            job, antigen_bytes = load_project(args.project)
+            if job.fixture_id != args.fixture:
+                raise LabmateError("project fixture_id 与 --fixture 不一致")
+            backend = ReplayBackend(fixture_path(args.fixture))
+            result = backend.submit(job, antigen_bytes, args.output)
+            mode_label = "REPLAY"
+        else:
+            job, candidate_fasta, regions_file, antigen_bytes = load_live_local_project(args.project)
+            backend = LiveLocalBackend()
+            result = backend.submit(job, candidate_fasta=candidate_fasta, regions_file=regions_file, antigen_bytes=antigen_bytes, output_root=args.output)
+            mode_label = "LIVE LOCAL (VERIFIED LIVE)"
         print(
             json.dumps(
                 {
-                    "mode": "REPLAY",
+                    "mode": mode_label,
                     "run_id": result.run_id,
                     "run_dir": result.run_dir,
                     "report": result.report_path,
@@ -80,4 +89,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

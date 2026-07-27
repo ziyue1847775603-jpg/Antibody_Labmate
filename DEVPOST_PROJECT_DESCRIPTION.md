@@ -1,5 +1,8 @@
 # Devpost Project Description
 
+> Archived Phase 1 submission copy. Current Phase 2a status and evidence are
+> documented in `README.md` and `LIVE_LOCAL_VALIDATION.md`.
+
 ## Project name
 
 Antibody Labmate
@@ -105,4 +108,3 @@ future provider validation.
 This software-test fixture and its ranking do not demonstrate binding,
 affinity, specificity, safety, efficacy, or therapeutic effect. Experimental
 validation is required for real scientific use.
-

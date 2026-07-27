@@ -1,12 +1,22 @@
 # Antibody Labmate — CDR-to-Docking Workflow
 
-> **REPLAY ONLY · FIXED HASH-VERIFIED DEMO · NOT LIVE COMPUTE**
+> **REPLAY DEMO + VERIFIED LIVE LOCAL CLI · NO LIVE REMOTE**
 
-🌐 **Live Replay Demo:** [Open Antibody Labmate](https://antibodylabmate-jxifsgmgfipzdh7nrx3wdz.streamlit.app/)
+本版本保留 Phase 1 Replay MVP，并新增 Phase 2a Live Local CLI。Replay 接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行固定产物重放。运行时会重新完成 PDB 解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。
 
-这是按照《Antibody Labmate 最终执行路线 v1.1》实现的 Phase 1 Replay MVP。它接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行 Replay。运行时会重新完成 PDB 解析、候选/结构/docking 固定输出解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。
+Streamlit 页面仍只展示 Replay。CLI 另提供 `verified_live` 的 Live Local 路径：它调用用户自行安装的 ColabFold 与 LightDock；不会下载、捆绑或模拟这两个工具。该状态只覆盖 [`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md) 记录的本机小规模配置，不代表其他版本、参数或科学有效性。Live Remote 仍为 `unavailable`。
 
-本版本不会安装、调用或模拟 IgCraft、ColabFold、LightDock、ElliDock、HDOCK、PyMOL 或远程 worker。Live Local 与 Live Remote 均为 `unavailable`。
+## Live Local（已验证限定配置、CLI-only）
+
+Live Local 接受完整 VH/VL 候选 FASTA、精确的 region CSV 和一个单链抗原 PDB。它依次调用本机 ColabFold、LightDock，再执行几何界面分析、候选排名和 HTML 报告。所有外部命令输出写入 run 日志；成功完成全部校验后，报告与 manifest 标记为 `LIVE LOCAL · VERIFIED LIVE`。
+
+开始前请单独安装并确认本机可运行 `colabfold_batch`、`lightdock3_setup.py`、`lightdock3.py`、`lgd_generate_conformations.py`。工具不会由本项目安装。配置会 fail closed：必须显式指定 MSA 模式、预装模型目录和 `alphafold2_multimer_v3`；模板使用不联系公共 MSA 服务的 `single_sequence`。复制 [`examples/live_local`](examples/live_local) 到仓库外并填写有权处理的输入后：
+
+```bash
+labmate run project.json --mode live_local --output runs
+```
+
+详细输入格式见 [`examples/live_local/README.md`](examples/live_local/README.md)。真实验证记录、工具版本、失败与修复、输出哈希及未覆盖范围见 [`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md)。新机器或不同工具版本仍应先用很小的 smoke 参数运行并复核日志、PDB 链映射、score-pose 对应关系和 manifest。
 
 ## 最短评委运行路径
 
@@ -53,7 +63,7 @@ Cloud 步骤见 [`DEPLOYMENT.md`](DEPLOYMENT.md)。
 python -m pytest
 ```
 
-测试覆盖 CDR 标准化和非法字符、PDB 大小/链/MODEL/altloc、状态机、固定 fixture 与输入 SHA-256、LightDock Live gate、界面接触与 clash、归一化边界、HTML/manifest/ZIP，以及三类篡改拒绝路径。
+测试覆盖 CDR 标准化和非法字符、PDB 大小/链/MODEL/altloc、Replay 状态机与 fixture 哈希、真实 ColabFold 文件配对/链映射/pLDDT、LightDock GSO 行号/分数/pose 映射、界面接触与 clash、归一化边界、隐私清洗、HTML/manifest/ZIP，以及篡改拒绝路径。
 
 Streamlit 启动烟测：
 
@@ -178,7 +188,7 @@ RUN_ID/
 
 - ReplayBackend：`replay_only`，仅对 `demo_001` 的精确输入启用。
 - LightDockProvider：默认 docking provider 契约，`replay_only`。只实现固定 CSV/PDB schema 解析；调用 `dock()` 会抛出明确错误。
-- Live Local：`unavailable`。
+- Live Local：`verified_live`，仅本机 CLI；验证范围为 ColabFold 1.6.2、离线 `single_sequence`、预装 multimer-v3 权重、外部 LightDock 0.9.4 和一候选小规模 smoke 参数。其他版本、MSA-backed 模式、评分函数、规模和科学有效性不在该状态范围内。
 - Live Remote：`unavailable`。
 - ElliDockProvider/HDOCKProvider：Phase 1 不创建虚假 skeleton，也不出现在可运行选择框。
 - 普通 DiffDock：不属于蛋白–蛋白 docking 后端。
@@ -187,7 +197,7 @@ RUN_ID/
 
 本工作流生成的是计算候选与计算优先级排名。结构预测置信度、对接分数及几何接触分析不能证明真实结合、亲和力、特异性、安全性或治疗效果。任何实验、公开传播或商业使用均应由使用者完成必要的序列权利确认、风险评估和实验验证。
 
-报告只写相对 artifact 路径，不写 token、API key、环境变量或本机绝对路径。Replay 不联网，不向外部服务发送序列或结构。
+报告只写相对 artifact 路径和去标识化命令名，不写 token、API key、实际环境变量、用户名或本机绝对路径。Replay 不联网。已验证的 Live Local 配置使用 `single_sequence`，不向公共 MSA 服务发送序列；应用也不下载模型。
 
 ## 重新生成合成 fixture
 
@@ -212,16 +222,17 @@ python -m scripts.package_project
 
 ## AI 辅助与贡献记录
 
-本 Phase 1 实现由 Codex 根据用户提供的 v1.1 路线和明确产品决策协助创建，包括数据模型、Replay 状态机、校验器、分析/排名、报告、UI 与测试。项目负责人仍需对科学措辞、fixture 权利、比赛展示、提交时段内实际贡献和最终发布负责；Git、README、Devpost 与视频中的贡献描述应与事实一致。
+本项目由 Codex 根据用户提供的路线和明确产品决策协助实现，包括 Phase 1 Replay 及 Phase 2a Live Local 的数据模型、状态机、校验器、适配器、分析/排名、报告、UI 与测试。项目负责人仍需对科学措辞、输入权利、展示和最终发布负责；Git、README、Devpost 与视频中的贡献描述应与事实一致。
 
 ## 当前未验证部分
 
-- IgCraft CDR-only carrier/inpainting；
-- ColabFold VH:VL complex、链映射与实际输出 schema；
-- LightDock 安装、命令、性能、真实 score/pose materialization 与 GPL 组合分发；
+- 应用内 IgCraft 执行与模型验证；
+- ColabFold 公共或本地 MSA-backed 模式、模板模式、其他版本/模型、批量规模与性能；
+- LightDock 其他版本、评分函数、大规模参数、性能与任何 GPL 组合分发；
 - ElliDock GPU/Linux；
-- HDOCK 书面许可 gate；
+- HDOCK 与 Schrödinger（均未使用、未实现）；
 - PyMOL 渲染；
-- Live Local、fully offline、Live Remote、鉴权、隔离、取消、超时和数据清理。
+- Live Remote、鉴权、隔离、取消、超时和数据清理；
+- 任何亲和力、结合自由能、疗效、安全性或实验结论。
 
-上述内容属于后续 Phase 0 Spike / Phase 2–3，不是本版本的可用能力。
+上述内容不是本版本的已验证能力。`verified_live` 只表示记录范围内的软件集成链路真实完成并经产物核对。
