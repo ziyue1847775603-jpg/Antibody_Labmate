@@ -1,5 +1,8 @@
 # Demo Script — Under Three Minutes
 
+> Archived Phase 1 Replay demo script. The Streamlit demo remains Replay-only;
+> current Live Local CLI status is documented in `LIVE_LOCAL_VALIDATION.md`.
+
 Target runtime: **2:35–2:50**. Spoken copy: approximately 330 words.
 
 ## 0:00–0:20 — Truthful scope
@@ -70,4 +73,3 @@ after real providers are independently licensed and validated.”
 - Keep the REPLAY banner visible in every app view.
 - Do not say that LightDock, IgCraft, or ColabFold ran.
 - Keep the final video below 3:00 and verify audio before upload.
-

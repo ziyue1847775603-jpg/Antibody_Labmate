@@ -1,4 +1,4 @@
-"""Streamlit UI for the strict Phase 1 Replay MVP."""
+"""Streamlit UI for the strict Replay demo; Live Local is intentionally CLI-only."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ if "cdr_h_cdr1" not in st.session_state:
     reset_demo(demo_job)
 
 st.title("Antibody Labmate — CDR-to-Docking Workflow")
-st.caption("Phase 1 Replay MVP：只重放精确匹配的合成 fixture；不会运行或模拟 IgCraft、ColabFold、LightDock 或远程 worker。")
+st.caption("网页仍是 Phase 1 Replay 演示：只重放精确匹配的合成 fixture；不会在网页中运行或模拟 IgCraft、ColabFold、LightDock 或远程 worker。")
 
 capabilities = capability_matrix()
 cap_cols = st.columns(3)
@@ -66,7 +66,7 @@ with cap_cols[0]:
     )
 with cap_cols[1]:
     st.markdown(
-        '<div class="cap-card cap-off"><strong>Live Local</strong><br><code>unavailable</code><br>Phase 2 未实现、未端到端验证。</div>',
+        '<div class="cap-card cap-ok"><strong>Live Local</strong><br><code>verified_live</code><br>仅限本机 CLI；已用限定版本与离线 single-sequence 小规模配置完成端到端验证。</div>',
         unsafe_allow_html=True,
     )
 with cap_cols[2]:
@@ -228,5 +228,4 @@ with settings_tab:
     st.selectbox("Mode", ["Replay"], disabled=True)
     st.selectbox("DockingProvider contract", ["LightDockProvider (replay_only)"], disabled=True)
     st.checkbox("PyMOL", value=False, disabled=True, help="S09 固定为 skipped_optional；不创建占位图。")
-    st.caption("Live/Remote 配置、工具路径和 API key 在 Phase 1 中不存在，因此也不会进入报告或 ZIP。")
-
+    st.caption("网页只提供安全的 Replay 演示。Live Local 只能从本机 CLI 运行；manifest 记录去标识化命令名、真实版本和相对 artifact 路径。Remote 仍不存在。")

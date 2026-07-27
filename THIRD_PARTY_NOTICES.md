@@ -1,6 +1,9 @@
 # Third-Party Notices
 
-This file distinguishes runtime Python dependencies from scientific tools that are only referenced by the architecture. No scientific model, checkpoint, database, docking binary, or PyMOL distribution is bundled.
+This file distinguishes runtime Python dependencies from scientific tools that
+are installed and invoked separately. No scientific model, checkpoint,
+database, docking source/binary, or PyMOL distribution is bundled in the MIT
+project archive.
 
 ## Direct runtime and test dependencies
 
@@ -15,18 +18,24 @@ Exact resolved package versions are recorded in `requirements.lock`.
 
 Streamlit installs transitive dependencies listed in `requirements.lock`. They are not copied into the source archive. A binary/container redistribution must regenerate a complete dependency license inventory for the exact build; this source notice is not a substitute for that release audit.
 
-## Scientific tools referenced but not bundled or executed
+## External scientific tools and execution by mode
 
-| Component | Upstream license/status noted by project route v1.1 | Phase 1 status |
-|---|---|---|
-| IgCraft | MIT for code/official weights page at route audit time | Not installed, not run; fixture is not IgCraft output |
-| ColabFold | MIT for code; model/database dependencies require separate review | Not installed, not run; fixture metrics are synthetic |
-| LightDock | GPL-3.0 | Default provider contract is `replay_only`; no source, binary, or LightDock output bundled; no `dock()` execution |
-| ElliDock | MIT at route audit time | Not implemented or run |
-| HDOCKlite | Academic/non-commercial with redistribution restrictions noted by route | Not included; unavailable without a separate written-license gate |
-| Open-Source PyMOL | BSD-like | Optional visualization is `skipped_optional`; not included or run |
+| Component | Upstream license/status noted by project route v1.1 | Replay mode | Phase 2a Live Local validation |
+|---|---|---|---|
+| IgCraft | MIT for code/official weights page at route audit time | Not installed or run; fixture is not IgCraft output | Not run by the application |
+| ColabFold | MIT for code; AlphaFold model/data dependencies require separate review | Not run; fixture metrics are synthetic | External ColabFold 1.6.2 executed with preinstalled `alphafold2_multimer_v3` weights and `single_sequence`; not bundled |
+| LightDock | GPL-3.0 | `LightDockProvider` remains `replay_only`; no execution | External LightDock 0.9.4 executed through CLI/file interfaces; no source, binary, environment, or GPL output is included in the source ZIP |
+| ElliDock | MIT at route audit time | Not implemented or run | Not implemented or run |
+| HDOCKlite | Academic/non-commercial with redistribution restrictions noted by route | Not included | Not used or implemented |
+| Schrödinger | Proprietary | Not included | Not used or implemented |
+| Open-Source PyMOL | BSD-like | `skipped_optional` | Not installed; `skipped_optional` |
 
-Before enabling or distributing any Live provider, re-check the license corresponding to the exact locked release/commit. If LightDock is included in a container or installer, the distributor must separately satisfy GPL-3.0 license, notice, and corresponding-source obligations. This project notice does not provide legal advice.
+Before enabling or distributing another Live provider/version, re-check the
+license corresponding to the exact release/commit. LightDock must remain a
+separate user installation for this MIT source distribution. If a distributor
+instead includes it in a container or installer, that distributor must
+separately satisfy GPL-3.0 license, notice, and corresponding-source
+obligations. This project notice does not provide legal advice.
 
 ## Synthetic fixture
 

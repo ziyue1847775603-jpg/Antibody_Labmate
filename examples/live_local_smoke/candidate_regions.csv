@@ -1,0 +1,15 @@
+candidate_id,chain,region,sequence,source_kind
+LIVE-SMOKE-001,H,H-fwr1,MLIQVINNQVGTLLTVSKQHTRCI,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,H,H-cdr1,LRGLRLEQ,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,H,H-fwr2,ISLEDGWTHADDIKW,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,H,H-cdr2,AFMKPDQM,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,H,H-fwr3,HMANADEVDQHDLMENNKPIVINDCGWGVWSNT,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,H,H-cdr3,NSSDEMYHIYHS,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,H,H-fwr4,GTVWFRRSRLNI,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,L,L-fwr1,LRMGVAFIAVYEERAQWMQHHCN,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,L,L-cdr1,PNFIFYIH,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,L,L-fwr2,PSDNWVQDNPQSYTF,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,L,L-cdr2,LKIGEWE,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,L,L-fwr3,VSLPGVDYFMYASTKEHQSHNFFCGQATLATWAH,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,L,L-cdr3,HWKMFPWYSA,project_authored_synthetic_live_smoke
+LIVE-SMOKE-001,L,L-fwr4,HKPTGMYHYNWKL,project_authored_synthetic_live_smoke
