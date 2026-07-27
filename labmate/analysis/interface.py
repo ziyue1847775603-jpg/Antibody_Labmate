@@ -114,6 +114,8 @@ def analyze_interfaces(
     structures_root: Path,
     output_dir: Path,
     config: InterfaceConfig = DEFAULT_INTERFACE_CONFIG,
+    execution_mode: str = "replay",
+    analysis_execution: str = "local_recompute_from_hash_verified_fixture_poses",
 ) -> dict[str, Any]:
     """Compute residue contacts, clash flags, and top-pose consensus."""
 
@@ -298,8 +300,8 @@ def analyze_interfaces(
     _write_csv(output_dir / "pose_consensus.csv", consensus_fields, consensus_rows)
     analysis_manifest = {
         "schema_version": "1.0.0",
-        "execution_mode": "replay",
-        "analysis_execution": "local_recompute_from_hash_verified_fixture_poses",
+        "execution_mode": execution_mode,
+        "analysis_execution": analysis_execution,
         "pymol_required": False,
         "definitions": {
             "contact_cutoff_angstrom": config.contact_cutoff_angstrom,
@@ -320,4 +322,3 @@ def analyze_interfaces(
         "pose_consensus": consensus_rows,
         "warnings": warnings,
     }
-

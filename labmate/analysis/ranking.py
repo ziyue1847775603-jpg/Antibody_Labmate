@@ -107,7 +107,7 @@ def build_candidate_metrics(
                 candidate_id=candidate_id,
                 mean_plddt=float(structure["mean_plddt"]),
                 cdr_plddt=float(structure["cdr_plddt"]),
-                interface_pae=float(structure["interface_pae"]),
+                interface_pae=float(structure["interface_pae"]) if structure.get("interface_pae") else None,
                 iptm=float(structure["iptm"]) if structure.get("iptm") else None,
                 docking_best_score=best,
                 docking_topk_median=float(median(scores)),
@@ -165,6 +165,8 @@ def rank_candidates(
     *,
     docking_higher_is_better: bool,
     output_dir: Path,
+    execution_mode: str = "replay",
+    ranking_execution: str = "local_recompute_from_replay_artifacts",
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     normalized: dict[str, dict[str, float | None]] = {}
@@ -284,7 +286,7 @@ def rank_candidates(
     if len(metrics) < 3:
         warnings.append("候选数少于 3；min-max 归一化排名不稳定，应优先查看原始指标")
     metric_definitions = {
-        "scope": "same run, same synthetic antigen, same replay provider schema and parameters only",
+        "scope": "same run, same antigen, same provider schema and parameters only",
         "directions": {
             **METRIC_DIRECTIONS,
             "docking_best_score": "higher_is_better" if docking_higher_is_better else "lower_is_better",
@@ -307,8 +309,8 @@ def rank_candidates(
     }
     ranking_manifest = {
         "schema_version": "1.0.0",
-        "execution_mode": "replay",
-        "ranking_execution": "local_recompute_from_replay_artifacts",
+        "execution_mode": execution_mode,
+        "ranking_execution": ranking_execution,
         "candidate_count": len(metrics),
         "warnings": warnings,
     }
@@ -319,4 +321,3 @@ def rank_candidates(
     ):
         (output_dir / name).write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {"rows": rows, "sensitivity": sensitivity, "warnings": warnings}
-

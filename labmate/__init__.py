@@ -1,3 +1,3 @@
-"""Antibody Labmate Replay MVP."""
+"""Antibody Labmate Replay and verified Live Local CLI."""
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"

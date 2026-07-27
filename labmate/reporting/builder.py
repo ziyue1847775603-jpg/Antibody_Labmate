@@ -66,3 +66,35 @@ def build_report(
         encoding="utf-8",
     )
     return output_path
+
+
+def build_live_report(
+    output_path: Path,
+    *,
+    run_id: str,
+    created_at: str,
+    job: dict[str, Any],
+    input_hashes: dict[str, str],
+    antigen_summary: dict[str, Any],
+    stages: list[StageRecord],
+    ranking_rows: list[dict[str, Any]],
+    warnings: list[str],
+    tool_versions: dict[str, str | None],
+) -> Path:
+    """Render the deliberately separate Live Local report; never use Replay branding."""
+    environment = Environment(
+        loader=FileSystemLoader(Path(__file__).resolve().parent / "templates"),
+        autoescape=True,
+        undefined=StrictUndefined,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    output_path.write_text(
+        environment.get_template("live_report.html.j2").render(
+            run_id=run_id, created_at=created_at, job=job, input_hashes=input_hashes,
+            antigen_summary=antigen_summary, stages=stages, ranking_rows=ranking_rows,
+            warnings=warnings, tool_versions=tool_versions,
+        ),
+        encoding="utf-8",
+    )
+    return output_path

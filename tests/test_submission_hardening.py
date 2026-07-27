@@ -16,7 +16,7 @@ def test_version_and_streamlit_deployment_contract(project_root: Path) -> None:
     config = tomllib.loads((project_root / ".streamlit" / "config.toml").read_text(encoding="utf-8"))
     requirements = (project_root / "requirements.txt").read_text(encoding="utf-8").splitlines()
 
-    assert __version__ == project_version() == pyproject["project"]["version"] == "0.1.1"
+    assert __version__ == project_version() == pyproject["project"]["version"] == "0.2.0"
     assert pyproject["project"]["requires-python"] == ">=3.11,<3.13"
     assert config["server"] == {
         "headless": True,
@@ -48,7 +48,7 @@ def test_documentation_and_license_submission_contract(project_root: Path) -> No
     assert "MIT License" in license_text
     for dependency in ("Streamlit", "Pydantic", "Jinja2", "pytest"):
         assert dependency in notices
-    assert "not bundled or executed" in notices
+    assert "not bundled" in notices
 
     spoken_sections = re.findall(r"\*\*Say:\*\* “(.*?)”", demo, flags=re.DOTALL)
     spoken_words = re.findall(r"[A-Za-z0-9][A-Za-z0-9’'_.-]*", " ".join(spoken_sections))
@@ -78,7 +78,7 @@ def test_fixture_paths_are_safe_on_posix_and_windows(project_root: Path) -> None
 
 
 def test_clean_release_zip_and_source_checksums(project_root: Path, tmp_path: Path) -> None:
-    output = build(tmp_path / "Antibody_Labmate_Phase1_Replay_MVP_v0.1.1.zip")
+    output = build(tmp_path / "Antibody_Labmate_Phase2a_Live_Local_v0.2.0.zip")
     prefix = f"{project_root.name}/"
 
     with zipfile.ZipFile(output) as archive:
@@ -101,4 +101,3 @@ def test_clean_release_zip_and_source_checksums(project_root: Path, tmp_path: Pa
         assert listed_paths == {
             name.removeprefix(prefix) for name in names if name != checksum_name
         }
-

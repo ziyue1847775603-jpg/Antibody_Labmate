@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import zipfile
 from pathlib import Path
@@ -63,17 +64,42 @@ def project_version() -> str:
 
 def included_files() -> list[Path]:
     files: list[Path] = []
-    for path in ROOT.rglob("*"):
-        relative = path.relative_to(ROOT)
-        if not path.is_file():
-            continue
-        if path.is_symlink():
-            raise RuntimeError(f"Release refuses symlinked file: {relative.as_posix()}")
-        if any(part in EXCLUDED_PARTS or part.endswith(".egg-info") for part in relative.parts):
-            continue
-        if path.suffix.lower() in {".pyc", ".pyo", ".zip"}:
-            continue
-        files.append(path)
+    for current, directories, filenames in os.walk(
+        ROOT, topdown=True, followlinks=False
+    ):
+        current_path = Path(current)
+        retained_directories: list[str] = []
+        for name in directories:
+            path = current_path / name
+            relative = path.relative_to(ROOT)
+            if (
+                name in EXCLUDED_PARTS
+                or name.endswith(".egg-info")
+                or any(
+                    part in EXCLUDED_PARTS or part.endswith(".egg-info")
+                    for part in relative.parts
+                )
+            ):
+                continue
+            if path.is_symlink():
+                raise RuntimeError(
+                    f"Release refuses symlinked directory: {relative.as_posix()}"
+                )
+            retained_directories.append(name)
+        directories[:] = retained_directories
+
+        for name in filenames:
+            path = current_path / name
+            relative = path.relative_to(ROOT)
+            if path.is_symlink():
+                raise RuntimeError(
+                    f"Release refuses symlinked file: {relative.as_posix()}"
+                )
+            if not path.is_file():
+                continue
+            if path.suffix.lower() in {".pyc", ".pyo", ".zip"}:
+                continue
+            files.append(path)
     return sorted(files, key=lambda item: item.relative_to(ROOT).as_posix())
 
 
@@ -145,7 +171,7 @@ def build(output: Path) -> Path:
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for path in release_files:
             relative = Path(ROOT.name) / path.relative_to(ROOT)
-            info = zipfile.ZipInfo(relative.as_posix(), date_time=(2026, 7, 19, 0, 0, 0))
+            info = zipfile.ZipInfo(relative.as_posix(), date_time=(2026, 7, 27, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = (0o755 if path.stat().st_mode & 0o111 else 0o644) << 16
             archive.writestr(info, path.read_bytes())
@@ -159,7 +185,7 @@ def main() -> int:
         "output",
         nargs="?",
         type=Path,
-        default=ROOT.parent / f"Antibody_Labmate_Phase1_Replay_MVP_v{project_version()}.zip",
+        default=ROOT.parent / f"Antibody_Labmate_Phase2a_Live_Local_v{project_version()}.zip",
     )
     args = parser.parse_args()
     print(build(args.output))

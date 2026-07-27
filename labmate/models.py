@@ -106,6 +106,124 @@ class JobSpec(BaseModel):
         return self
 
 
+class LiveLocalTools(BaseModel):
+    """Commands installed by the user on the local machine.
+
+    They are deliberately not packaged with Antibody Labmate.  Keeping the
+    executable names/paths in the project file makes the provenance record
+    inspectable and avoids silently downloading or invoking a cloud service.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    colabfold_batch: str = "colabfold_batch"
+    lightdock_setup: str = "lightdock3_setup.py"
+    lightdock_run: str = "lightdock3.py"
+    lightdock_generate: str = "lgd_generate_conformations.py"
+    colabfold_args: list[str] = Field(default_factory=list, max_length=32)
+    msa_network_policy: Literal["offline_single_sequence", "public_service_confirmed"] = (
+        "offline_single_sequence"
+    )
+    model_data_policy: Literal["preinstalled_only"] = "preinstalled_only"
+
+    @field_validator("colabfold_args")
+    @classmethod
+    def reject_nul_arguments(cls, value: list[str]) -> list[str]:
+        if any("\x00" in item for item in value):
+            raise ValueError("工具参数不得包含 NUL 字符")
+        return value
+
+    @model_validator(mode="after")
+    def require_explicit_colabfold_network_and_model_policy(self) -> "LiveLocalTools":
+        def option_values(name: str) -> list[str]:
+            values: list[str] = []
+            index = 0
+            while index < len(self.colabfold_args):
+                argument = self.colabfold_args[index]
+                if argument == name:
+                    if index + 1 >= len(self.colabfold_args):
+                        raise ValueError(f"{name} 缺少参数值")
+                    values.append(self.colabfold_args[index + 1])
+                    index += 2
+                    continue
+                prefix = name + "="
+                if argument.startswith(prefix):
+                    values.append(argument[len(prefix) :])
+                index += 1
+            return values
+
+        msa_modes = option_values("--msa-mode")
+        if len(msa_modes) != 1:
+            raise ValueError("必须且只能显式指定一次 ColabFold --msa-mode")
+        if self.msa_network_policy == "offline_single_sequence":
+            if msa_modes[0] != "single_sequence":
+                raise ValueError(
+                    "offline_single_sequence 策略只允许 --msa-mode single_sequence"
+                )
+        elif msa_modes[0] == "single_sequence":
+            raise ValueError(
+                "public_service_confirmed 策略与 --msa-mode single_sequence 矛盾"
+            )
+
+        data_paths = option_values("--data")
+        if len(data_paths) != 1 or not data_paths[0]:
+            raise ValueError(
+                "preinstalled_only 策略要求显式指定一次非空 ColabFold --data"
+            )
+        model_types = option_values("--model-type")
+        if model_types != ["alphafold2_multimer_v3"]:
+            raise ValueError(
+                "Phase 2a 当前要求显式使用 --model-type alphafold2_multimer_v3"
+            )
+        return self
+
+
+class LiveLocalDockingConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    steps: Annotated[int, Field(ge=1, le=10000)] = 20
+    swarms: Annotated[int, Field(ge=1, le=200)] = 4
+    glowworms: Annotated[int, Field(ge=1, le=500)] = 50
+    cores: Annotated[int, Field(ge=1, le=64)] = 1
+    top_poses_per_candidate: Annotated[int, Field(ge=1, le=20)] = 3
+    # LightDock scores are provider/scoring-function dependent.  The user must
+    # make the direction explicit rather than the application silently guessing.
+    score_direction: Literal["higher_is_better", "lower_is_better"]
+    score_name: str = "lightdock_score"
+
+
+class LiveLocalJobSpec(BaseModel):
+    """Phase 2a local, auditable execution contract.
+
+    Candidate sequences and region annotations are supplied by the user or an
+    external generator such as IgCraft.  No claim is made that IgCraft itself
+    was invoked by this application.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["2.0.0"] = "2.0.0"
+    mode: Literal["live_local"] = "live_local"
+    backend: Literal["local"] = "local"
+    candidate_fasta: str
+    candidate_regions_file: str
+    antigen: AntigenSpec
+    tools: LiveLocalTools = Field(default_factory=LiveLocalTools)
+    docking: LiveLocalDockingConfig
+    rights_confirmed: bool
+    source_type: Literal[
+        "user_provided", "igcraft_generated", "project_authored_synthetic"
+    ] = "user_provided"
+
+    @model_validator(mode="after")
+    def require_rights_confirmation(self) -> "LiveLocalJobSpec":
+        if not self.rights_confirmed:
+            raise ValueError("必须确认拥有输入、工具及计算所需权利")
+        if len(self.antigen.chains) != 1:
+            raise ValueError("Live Local v2.0 目前只支持一个抗原链；多链抗原尚未验证")
+        return self
+
+
 class Capability(BaseModel):
     name: str
     status: CapabilityStatus
@@ -144,7 +262,7 @@ class CandidateMetric(BaseModel):
     candidate_id: str
     mean_plddt: float
     cdr_plddt: float
-    interface_pae: float
+    interface_pae: float | None = None
     iptm: float | None = None
     docking_best_score: float
     docking_topk_median: float
@@ -185,4 +303,3 @@ class RunResult(BaseModel):
     manifest_path: str
     report_path: str
     stages: list[StageRecord]
-
