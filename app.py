@@ -58,7 +58,7 @@ st.title("Antibody Labmate — CDR-to-Docking Workflow")
 st.caption("网页仍是 Phase 1 Replay 演示：只重放精确匹配的合成 fixture；不会在网页中运行或模拟 IgCraft、ColabFold、LightDock 或远程 worker。")
 
 capabilities = capability_matrix()
-cap_cols = st.columns(3)
+cap_cols = st.columns(4)
 with cap_cols[0]:
     st.markdown(
         '<div class="cap-card cap-ok"><strong>Replay</strong><br><code>replay_only</code><br>精确输入与 fixture 文件 SHA-256 全部匹配后可运行。</div>',
@@ -70,6 +70,11 @@ with cap_cols[1]:
         unsafe_allow_html=True,
     )
 with cap_cols[2]:
+    st.markdown(
+        '<div class="cap-card cap-off"><strong>Benchmark Local</strong><br><code>implemented_unverified</code><br>仅限本机 CLI；真实 synthetic 集成 smoke 已完成，DB5.5 科学验证未完成。</div>',
+        unsafe_allow_html=True,
+    )
+with cap_cols[3]:
     st.markdown(
         '<div class="cap-card cap-off"><strong>Live Remote</strong><br><code>unavailable</code><br>没有 API、worker、鉴权或任务隔离。</div>',
         unsafe_allow_html=True,
@@ -228,4 +233,4 @@ with settings_tab:
     st.selectbox("Mode", ["Replay"], disabled=True)
     st.selectbox("DockingProvider contract", ["LightDockProvider (replay_only)"], disabled=True)
     st.checkbox("PyMOL", value=False, disabled=True, help="S09 固定为 skipped_optional；不创建占位图。")
-    st.caption("网页只提供安全的 Replay 演示。Live Local 只能从本机 CLI 运行；manifest 记录去标识化命令名、真实版本和相对 artifact 路径。Remote 仍不存在。")
+    st.caption("网页只提供安全的 Replay 演示。Live Local 与 Benchmark Local 只能从本机 CLI 运行；Benchmark Local 仍为 implemented_unverified。manifest 记录去标识化命令名、真实版本和相对 artifact 路径。Remote 仍不存在。")

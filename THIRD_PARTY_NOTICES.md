@@ -24,7 +24,7 @@ Streamlit installs transitive dependencies listed in `requirements.lock`. They a
 |---|---|---|---|
 | IgCraft | MIT for code/official weights page at route audit time | Not installed or run; fixture is not IgCraft output | Not run by the application |
 | ColabFold | MIT for code; AlphaFold model/data dependencies require separate review | Not run; fixture metrics are synthetic | External ColabFold 1.6.2 executed with preinstalled `alphafold2_multimer_v3` weights and `single_sequence`; not bundled |
-| LightDock | GPL-3.0 | `LightDockProvider` remains `replay_only`; no execution | External LightDock 0.9.4 executed through CLI/file interfaces; no source, binary, environment, or GPL output is included in the source ZIP |
+| LightDock | GPL-3.0 | `LightDockProvider` remains `replay_only`; no execution | External LightDock 0.9.4 executed through CLI/file interfaces; no source, binary, environment, or GPL output is included in the source ZIP. Benchmark Local also requires a separate user installation and remains `implemented_unverified`. |
 | ElliDock | MIT at route audit time | Not implemented or run | Not implemented or run |
 | HDOCKlite | Academic/non-commercial with redistribution restrictions noted by route | Not included | Not used or implemented |
 | Schrödinger | Proprietary | Not included | Not used or implemented |
@@ -37,6 +37,15 @@ instead includes it in a container or installer, that distributor must
 separately satisfy GPL-3.0 license, notice, and corresponding-source
 obligations. This project notice does not provide legal advice.
 
+Schrödinger/PIPER is permitted only as a user-run external commercial
+comparison under that user's license. Antibody Labmate does not call or bundle
+it and does not distribute proprietary project files, scripts, license
+material, credentials, or outputs.
+
 ## Synthetic fixture
 
 `fixtures/demo_001` contains only project-authored synthetic sequences, coordinates, scores, poses, and metadata dedicated under CC0-1.0. It contains no third-party tool output, binary, patented demo CDR, or confidential input. The values have no biological meaning.
+
+`examples/benchmark_local` likewise contains only project-authored CC0
+synthetic coordinates and configuration text. Its PDB files are inputs, not
+outputs from LightDock, PIPER, Schrödinger, or another scientific package.

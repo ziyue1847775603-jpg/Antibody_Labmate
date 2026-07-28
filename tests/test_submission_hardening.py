@@ -3,12 +3,16 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import tomllib
 import zipfile
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
+import pytest
+
 from labmate import __version__
-from scripts.package_project import EXCLUDED_PARTS, build, project_version
+from scripts import package_project
+from scripts.package_project import EXCLUDED_PARTS, project_version
 
 
 def test_version_and_streamlit_deployment_contract(project_root: Path) -> None:
@@ -77,8 +81,22 @@ def test_fixture_paths_are_safe_on_posix_and_windows(project_root: Path) -> None
         assert (fixture_root / Path(*posix.parts)).is_file()
 
 
-def test_clean_release_zip_and_source_checksums(project_root: Path, tmp_path: Path) -> None:
-    output = build(tmp_path / "Antibody_Labmate_Phase2a_Live_Local_v0.2.0.zip")
+def test_clean_release_zip_and_source_checksums(
+    project_root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository_checksum = project_root / "SOURCE_CHECKSUMS.sha256"
+    checksum_before = repository_checksum.read_bytes()
+    isolated_root = tmp_path / project_root.name
+    shutil.copytree(
+        project_root,
+        isolated_root,
+        ignore=shutil.ignore_patterns(*EXCLUDED_PARTS),
+    )
+    monkeypatch.setattr(package_project, "ROOT", isolated_root)
+
+    output = package_project.build(
+        tmp_path / "Antibody_Labmate_Phase2a_Live_Local_v0.2.0.zip"
+    )
     prefix = f"{project_root.name}/"
 
     with zipfile.ZipFile(output) as archive:
@@ -91,7 +109,10 @@ def test_clean_release_zip_and_source_checksums(project_root: Path, tmp_path: Pa
         assert all(not name.endswith((".pyc", ".pyo", ".zip")) for name in names)
 
         checksum_name = prefix + "SOURCE_CHECKSUMS.sha256"
-        checksum_lines = archive.read(checksum_name).decode("utf-8").splitlines()
+        archived_checksum = archive.read(checksum_name)
+        checksum_lines = archived_checksum.decode("utf-8").splitlines()
+        if b"\r\n" in checksum_before:
+            assert archived_checksum.count(b"\r\n") == len(checksum_lines)
         listed_paths: set[str] = set()
         for line in checksum_lines:
             expected, relative = line.split("  ", 1)
@@ -101,3 +122,4 @@ def test_clean_release_zip_and_source_checksums(project_root: Path, tmp_path: Pa
         assert listed_paths == {
             name.removeprefix(prefix) for name in names if name != checksum_name
         }
+    assert repository_checksum.read_bytes() == checksum_before

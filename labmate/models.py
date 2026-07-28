@@ -13,6 +13,7 @@ from labmate.validators.cdr import normalize_cdr_sequence
 
 class CapabilityStatus(StrEnum):
     VERIFIED_LIVE = "verified_live"
+    IMPLEMENTED_UNVERIFIED = "implemented_unverified"
     AVAILABLE_UNVERIFIED = "available_unverified"
     REPLAY_ONLY = "replay_only"
     UNAVAILABLE = "unavailable"
@@ -221,6 +222,132 @@ class LiveLocalJobSpec(BaseModel):
             raise ValueError("必须确认拥有输入、工具及计算所需权利")
         if len(self.antigen.chains) != 1:
             raise ValueError("Live Local v2.0 目前只支持一个抗原链；多链抗原尚未验证")
+        return self
+
+
+class BenchmarkLocalTools(BaseModel):
+    """Explicit paths to a user-installed external LightDock toolchain."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    lightdock_setup: str
+    lightdock_run: str
+    lightdock_generate: str
+    lightdock_cluster: str
+
+    @field_validator(
+        "lightdock_setup",
+        "lightdock_run",
+        "lightdock_generate",
+        "lightdock_cluster",
+    )
+    @classmethod
+    def require_explicit_local_path(cls, value: str) -> str:
+        lowered = value.lower()
+        if (
+            not value
+            or "\x00" in value
+            or "://" in value
+            or lowered.startswith(("http:", "https:", "ftp:"))
+        ):
+            raise ValueError("LightDock executable 必须是显式本地路径")
+        if "/" not in value and "\\" not in value:
+            raise ValueError("LightDock executable 不得依赖 PATH；必须提供显式路径")
+        return value
+
+
+class BenchmarkLocalJobSpec(BaseModel):
+    """Fail-closed PDB-to-LightDock local benchmark contract."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    schema_version: Literal["2.2.0"] = "2.2.0"
+    project_name: Annotated[str, Field(min_length=1, max_length=128)]
+    mode: Literal["benchmark_local"] = "benchmark_local"
+    rights_confirmed: bool
+    antibody_pdb: str
+    antigen_pdb: str
+    reference_complex_pdb: str | None = None
+    # Keys are input PDB chain IDs; values are normalized docking chain IDs.
+    antibody_chain_mapping: dict[str, str]
+    antigen_chain_mapping: dict[str, str]
+    reference_chain_mapping: dict[str, str] | None = None
+    tools: BenchmarkLocalTools
+    score_name: Annotated[str, Field(min_length=1, max_length=128)]
+    score_direction: Literal["higher_is_better", "lower_is_better"]
+    steps: Annotated[int, Field(ge=1, le=10000)] = 20
+    swarms: Annotated[int, Field(ge=1, le=200)] = 4
+    glowworms: Annotated[int, Field(ge=1, le=500)] = 50
+    cores: Annotated[int, Field(ge=1, le=64)] = 1
+    top_poses: Annotated[int, Field(ge=1, le=20)] = 3
+    random_seed: Annotated[int, Field(ge=0, le=2**31 - 1)] = 42
+    random_seed_recording: Literal["manifest_only_external_lightdock_cli"] = (
+        "manifest_only_external_lightdock_cli"
+    )
+    output_dir: str = "runs/benchmark_local"
+    source_type: Literal["user_provided", "project_authored_synthetic"] = (
+        "user_provided"
+    )
+
+    @field_validator(
+        "antibody_pdb",
+        "antigen_pdb",
+        "reference_complex_pdb",
+        "output_dir",
+    )
+    @classmethod
+    def reject_remote_or_unsafe_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        lowered = value.lower()
+        if (
+            not value
+            or "\x00" in value
+            or "://" in value
+            or lowered.startswith(("http:", "https:", "ftp:"))
+        ):
+            raise ValueError("benchmark-local 只接受本地路径")
+        return value
+
+    @staticmethod
+    def _validate_mapping(mapping: dict[str, str], label: str) -> None:
+        if not mapping:
+            raise ValueError(f"{label} 链映射不得为空")
+        for source, target in mapping.items():
+            if (
+                len(source) != 1
+                or not source.isalnum()
+                or len(target) != 1
+                or not target.isalnum()
+            ):
+                raise ValueError(f"{label} 链映射必须使用单字符字母或数字")
+        if len(set(mapping.values())) != len(mapping):
+            raise ValueError(f"{label} 目标链不得重复")
+
+    @model_validator(mode="after")
+    def validate_benchmark_contract(self) -> "BenchmarkLocalJobSpec":
+        if not self.rights_confirmed:
+            raise ValueError("必须确认拥有输入数据和外部软件所需权利")
+        self._validate_mapping(self.antibody_chain_mapping, "antibody")
+        self._validate_mapping(self.antigen_chain_mapping, "antigen")
+        antibody_targets = set(self.antibody_chain_mapping.values())
+        if antibody_targets not in ({"H"}, {"H", "L"}):
+            raise ValueError("抗体目标链必须为 H（VHH）或 H/L（VH/VL）")
+        antigen_targets = set(self.antigen_chain_mapping.values())
+        if antibody_targets & antigen_targets:
+            raise ValueError("抗体链与抗原链不得重叠")
+        if set(self.antibody_chain_mapping) & set(self.antigen_chain_mapping):
+            raise ValueError("抗体与抗原输入链 ID 不得重叠")
+        expected_reference_targets = antibody_targets | antigen_targets
+        if self.reference_complex_pdb is None:
+            if self.reference_chain_mapping is not None:
+                raise ValueError("未提供 reference PDB 时不得提供 reference 链映射")
+        else:
+            if self.reference_chain_mapping is None:
+                raise ValueError("提供 reference PDB 时必须提供 reference 链映射")
+            self._validate_mapping(self.reference_chain_mapping, "reference")
+            if set(self.reference_chain_mapping.values()) != expected_reference_targets:
+                raise ValueError("reference 目标链集合必须与标准化抗体/抗原链完全一致")
         return self
 
 

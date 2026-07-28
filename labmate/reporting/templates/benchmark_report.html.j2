@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Antibody Labmate — Benchmark Local {{ run_id }}</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:2rem;max-width:1100px;color:#19212b}
+h1{margin-bottom:.2rem}.badge{display:inline-block;padding:.25rem .55rem;border-radius:.3rem;background:#fff3cd;color:#664d03;font-weight:800}
+table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #d7dce2;padding:.42rem;text-align:left;font-size:.9rem}
+th{background:#f4f6f8}.warning{border-left:4px solid #b7791f;padding:.7rem 1rem;background:#fffaf0}code{overflow-wrap:anywhere}
+</style></head><body>
+<h1>Antibody Labmate</h1>
+<p><span class="badge">BENCHMARK LOCAL</span> <strong>COMPUTATIONAL DOCKING BENCHMARK</strong></p>
+<p><strong>NOT BINDING OR AFFINITY EVIDENCE</strong></p>
+<p>Run <code>{{ run_id }}</code> · {{ created_at }} · status: implemented_unverified</p>
+<p class="warning">Scores rank poses only within this run and declared scoring configuration. They are not affinity, binding free energy, specificity, safety, efficacy, or experimental evidence.</p>
+<h2>Configuration</h2>
+<ul>
+<li>Project: {{ job.project_name }}</li>
+<li>ColabFold: skipped by design; network used: no</li>
+<li>Antibody mapping: {{ job.antibody_chain_mapping }}</li>
+<li>Antigen mapping: {{ job.antigen_chain_mapping }}</li>
+<li>Score: {{ job.score_name }}; direction: {{ job.score_direction }}</li>
+<li>LightDock version: {{ tool_versions.lightdock_run }}; external GPL-3.0 installation, not bundled</li>
+</ul>
+<h2>Poses</h2>
+<table><tr><th>Rank</th><th>Pose</th><th>Docking score</th><th>Swarm</th><th>Glowworm</th><th>File</th></tr>
+{% for row in pose_rows %}<tr><td>{{ row.pose_rank }}</td><td>{{ row.pose_id }}</td><td>{{ row.docking_score }}</td><td>{{ row.swarm_id }}</td><td>{{ row.glowworm_id }}</td><td>{{ row.pose_path }}</td></tr>{% endfor %}
+</table>
+{% if metric_rows %}
+<h2>Reference metrics</h2>
+<table><tr><th>Rank</th><th>Ligand RMSD</th><th>Interface RMSD</th><th>Fnat</th><th>Precision</th><th>Recall</th><th>F1</th></tr>
+{% for row in metric_rows %}<tr><td>{{ row.pose_rank }}</td><td>{{ row.ligand_rmsd }}</td><td>{{ row.interface_rmsd }}</td><td>{{ row.fraction_native_contacts }}</td><td>{{ row.interface_residue_precision }}</td><td>{{ row.interface_residue_recall }}</td><td>{{ row.interface_residue_f1 }}</td></tr>{% endfor %}
+</table>
+{% endif %}
+<h2>Top-N summary</h2>
+<table>{% for row in summaries %}<tr>{% for key,value in row.items() %}<th>{{ key }}</th><td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</table>
+<h2>Warnings and limits</h2><ul>{% for item in warnings %}<li>{{ item }}</li>{% endfor %}</ul>
+<hr><p><strong>BENCHMARK LOCAL · COMPUTATIONAL DOCKING BENCHMARK · NOT BINDING OR AFFINITY EVIDENCE</strong></p>
+</body></html>

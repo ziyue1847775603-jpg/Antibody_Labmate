@@ -13,6 +13,8 @@ from pydantic import ValidationError
 from labmate import __version__
 from labmate.backends.replay import ReplayBackend
 from labmate.backends.local import LiveLocalBackend
+from labmate.backends.benchmark import BenchmarkLocalBackend
+from labmate.benchmark_local import load_benchmark_local_project
 from labmate.docking.registry import capability_matrix
 from labmate.errors import LabmateError
 from labmate.workflow import load_project
@@ -41,7 +43,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = subcommands.add_parser("run", help="run Replay or the user-installed Live Local pipeline")
     run.add_argument("project", type=Path, help="JSON-compatible project.yaml")
-    run.add_argument("--mode", choices=["replay", "live_local"], default="replay")
+    run.add_argument(
+        "--mode",
+        choices=["replay", "live_local", "benchmark_local"],
+        default="replay",
+    )
     run.add_argument("--fixture", default="demo_001")
     run.add_argument("--output", type=Path, default=Path("runs"))
 
@@ -62,11 +68,32 @@ def main(argv: list[str] | None = None) -> int:
             backend = ReplayBackend(fixture_path(args.fixture))
             result = backend.submit(job, antigen_bytes, args.output)
             mode_label = "REPLAY"
-        else:
+        elif args.mode == "live_local":
             job, candidate_fasta, regions_file, antigen_bytes = load_live_local_project(args.project)
             backend = LiveLocalBackend()
             result = backend.submit(job, candidate_fasta=candidate_fasta, regions_file=regions_file, antigen_bytes=antigen_bytes, output_root=args.output)
             mode_label = "LIVE LOCAL (VERIFIED LIVE)"
+        else:
+            (
+                job,
+                antibody_path,
+                antigen_path,
+                reference_path,
+                configured_output,
+            ) = load_benchmark_local_project(args.project)
+            backend = BenchmarkLocalBackend()
+            result = backend.submit(
+                job,
+                antibody_path=antibody_path,
+                antigen_path=antigen_path,
+                reference_path=reference_path,
+                output_root=(
+                    args.output
+                    if args.output != Path("runs")
+                    else configured_output
+                ),
+            )
+            mode_label = "BENCHMARK LOCAL (IMPLEMENTED UNVERIFIED)"
         print(
             json.dumps(
                 {

@@ -154,9 +154,18 @@ def build(output: Path) -> Path:
     checksum_path = ROOT / "SOURCE_CHECKSUMS.sha256"
     before_checksum = [path for path in included_files() if path != checksum_path]
     audit_release_files(before_checksum)
-    checksum_path.write_text(
-        "".join(f"{sha256(path)}  {path.relative_to(ROOT).as_posix()}\n" for path in before_checksum),
-        encoding="utf-8",
+    existing = checksum_path.read_bytes() if checksum_path.is_file() else b""
+    line_ending = (
+        b"\r\n"
+        if b"\r\n" in existing and existing.count(b"\n") == existing.count(b"\r\n")
+        else b"\n"
+    )
+    checksum_path.write_bytes(
+        line_ending.join(
+            f"{sha256(path)}  {path.relative_to(ROOT).as_posix()}".encode("utf-8")
+            for path in before_checksum
+        )
+        + line_ending
     )
     output = output.resolve()
     try:
