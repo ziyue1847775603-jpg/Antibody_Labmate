@@ -1,0 +1,6 @@
+CC0 1.0 Universal
+
+The synthetic coordinates and configuration example in this directory are
+dedicated to the public domain under CC0-1.0. They have no biological meaning
+and are not output from LightDock, PIPER, Schrödinger, or another scientific
+software package.

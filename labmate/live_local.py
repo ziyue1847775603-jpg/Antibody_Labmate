@@ -16,6 +16,7 @@ import platform
 import re
 import shutil
 import subprocess
+import time
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -131,6 +132,8 @@ def _probe_version(command: list[str], pattern: str) -> str:
         )
     except (OSError, subprocess.TimeoutExpired):
         return "not-probed"
+    if completed.returncode != 0:
+        return "not-probed"
     match = re.search(pattern, completed.stdout or "", flags=re.IGNORECASE)
     return match.group(1) if match else "not-probed"
 
@@ -205,7 +208,7 @@ def preflight_live_local(job: LiveLocalJobSpec) -> dict[str, Capability]:
 
 _WINDOWS_ABSOLUTE = re.compile(r"(?i)(?<![A-Za-z0-9])[A-Z]:[\\/][^\s\"'<>]+")
 _POSIX_LOCAL_ABSOLUTE = re.compile(
-    r"(?<![A-Za-z0-9])/(?:root|home|mnt|tmp|workspace|Users)(?:/[^\s\"'<>]+)+"
+    r"(?<![A-Za-z0-9<:/])/(?:[A-Za-z0-9._~+-]+/)+[A-Za-z0-9._~+-]+"
 )
 _SECRET_ASSIGNMENT = re.compile(
     r"(?i)\b(token|api[_-]?key|password|secret|authorization|credential)"
@@ -219,8 +222,6 @@ _ENVIRONMENT_VARIABLE_REFERENCE = re.compile(
     r"\b[A-Z][A-Z0-9_]{2,}\b"
     r"(?=(?:\s+shell)?\s+environment variable\b)"
 )
-
-
 def _redact_text(text: str, *, cwd: Path) -> str:
     sensitive: set[str] = {
         str(cwd.resolve()),
@@ -228,10 +229,13 @@ def _redact_text(text: str, *, cwd: Path) -> str:
         str(cwd.resolve()).replace("\\", "/"),
         str(Path.home()).replace("\\", "/"),
     }
-    for key in ("USERNAME", "USER", "LOGNAME"):
+    for key in ("USERNAME", "USER", "LOGNAME", "HOSTNAME", "COMPUTERNAME"):
         value = os.environ.get(key, "")
         if len(value) >= 3:
             sensitive.add(value)
+    hostname = platform.node()
+    if len(hostname) >= 3:
+        sensitive.add(hostname)
     for key, value in os.environ.items():
         if (
             re.search(r"(?i)(token|key|secret|password|credential|authorization)", key)
@@ -245,36 +249,64 @@ def _redact_text(text: str, *, cwd: Path) -> str:
     redacted = _POSIX_LOCAL_ABSOLUTE.sub("<local-path>", redacted)
     redacted = _SECRET_ASSIGNMENT.sub(r"\1\2<redacted>", redacted)
     redacted = _TOKEN_SHAPES.sub("<redacted-token>", redacted)
+    for key in sorted(os.environ, key=len, reverse=True):
+        redacted = re.sub(
+            rf"(?im)^\s*(?:export\s+)?{re.escape(key)}\s*[=:]\s*[^\r\n;]+$",
+            "<environment-variable>=<redacted>",
+            redacted,
+        )
     redacted = _ENVIRONMENT_VARIABLE_REFERENCE.sub(
         "<environment-variable>", redacted
     )
     return redacted
 
 
-def _run(command: list[str], *, cwd: Path, log_path: Path) -> None:
+def _run(
+    command: list[str],
+    *,
+    cwd: Path,
+    log_path: Path,
+    command_records: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Run a user-configured executable safely and append reproducible logs."""
-    display = _redact_text(
-        " ".join([Path(command[0]).name, *command[1:]]),
+    safe_command = [
+        Path(command[0]).name,
+        *[_redact_text(argument, cwd=cwd) for argument in command[1:]],
+    ]
+    display = " ".join(safe_command)
+    started = time.perf_counter()
+    completed = subprocess.run(
+        command,
         cwd=cwd,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        encoding="utf-8",
+        errors="replace",
     )
+    elapsed = round(time.perf_counter() - started, 6)
+    stdout = _redact_text(completed.stdout or "", cwd=cwd)
+    stderr = _redact_text(completed.stderr or "", cwd=cwd)
     with log_path.open("a", encoding="utf-8") as log:
         log.write("$ " + display + "\n")
-        completed = subprocess.run(
-            command,
-            cwd=cwd,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            check=False,
-            encoding="utf-8",
-            errors="replace",
-        )
-        log.write(_redact_text(completed.stdout or "", cwd=cwd))
-        log.write(f"[exit={completed.returncode}]\n")
+        log.write("[stdout]\n" + stdout)
+        log.write("[stderr]\n" + stderr)
+        log.write(f"[exit={completed.returncode} elapsed_seconds={elapsed}]\n")
+    record = {
+        "command": safe_command,
+        "stdout": stdout,
+        "stderr": stderr,
+        "return_code": completed.returncode,
+        "elapsed_seconds": elapsed,
+    }
+    if command_records is not None:
+        command_records.append(record)
     if completed.returncode != 0:
         raise LabmateError(
-            f"本地工具失败（exit {completed.returncode}）；请查看 logs/live_local.log"
+            f"本地工具失败（exit {completed.returncode}）；请查看 logs/{log_path.name}"
         )
+    return record
 
 
 def _read_regions(path: Path, candidates: dict[str, dict[str, str]]) -> dict[str, dict[str, list[dict[str, Any]]]]:
@@ -728,7 +760,21 @@ def _sanitize_run_metadata(run_dir: Path) -> list[str]:
 
 def _audit_run_privacy(run_dir: Path, forbidden_values: list[str]) -> None:
     forbidden: set[bytes] = set()
-    for value in forbidden_values:
+    local_context = [
+        platform.node(),
+        *(
+            os.environ.get(key, "")
+            for key in ("USERNAME", "USER", "LOGNAME", "HOSTNAME", "COMPUTERNAME")
+        ),
+        *(
+            value
+            for key, value in os.environ.items()
+            if re.search(
+                r"(?i)(token|key|secret|password|credential|authorization)", key
+            )
+        ),
+    ]
+    for value in [*forbidden_values, *local_context]:
         if not value:
             continue
         for variant in {value, value.replace("\\", "/"), value.replace("/", "\\")}:

@@ -98,3 +98,39 @@ def build_live_report(
         encoding="utf-8",
     )
     return output_path
+
+
+def build_benchmark_report(
+    output_path: Path,
+    *,
+    run_id: str,
+    created_at: str,
+    job: dict[str, Any],
+    pose_rows: list[dict[str, Any]],
+    metric_rows: list[dict[str, Any]],
+    summaries: list[dict[str, Any]],
+    warnings: list[str],
+    tool_versions: dict[str, str],
+) -> Path:
+    """Render a self-contained Benchmark Local report with fixed disclaimers."""
+    environment = Environment(
+        loader=FileSystemLoader(Path(__file__).resolve().parent / "templates"),
+        autoescape=True,
+        undefined=StrictUndefined,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    output_path.write_text(
+        environment.get_template("benchmark_report.html.j2").render(
+            run_id=run_id,
+            created_at=created_at,
+            job=job,
+            pose_rows=pose_rows,
+            metric_rows=metric_rows,
+            summaries=summaries,
+            warnings=warnings,
+            tool_versions=tool_versions,
+        ),
+        encoding="utf-8",
+    )
+    return output_path

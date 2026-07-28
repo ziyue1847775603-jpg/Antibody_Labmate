@@ -1,0 +1,38 @@
+{
+  "schema_version": "2.2.0",
+  "project_name": "CC0-SYNTHETIC-BENCHMARK-TEMPLATE",
+  "mode": "benchmark_local",
+  "rights_confirmed": false,
+  "antibody_pdb": "antibody.pdb",
+  "antigen_pdb": "antigen.pdb",
+  "reference_complex_pdb": "reference_complex.pdb",
+  "antibody_chain_mapping": {
+    "H": "H",
+    "L": "L"
+  },
+  "antigen_chain_mapping": {
+    "A": "A"
+  },
+  "reference_chain_mapping": {
+    "H": "H",
+    "L": "L",
+    "A": "A"
+  },
+  "tools": {
+    "lightdock_setup": "$LIGHTDOCK_ROOT/bin/lightdock3_setup.py",
+    "lightdock_run": "$LIGHTDOCK_ROOT/bin/lightdock3.py",
+    "lightdock_generate": "$LIGHTDOCK_ROOT/bin/lgd_generate_conformations.py",
+    "lightdock_cluster": "$LIGHTDOCK_ROOT/bin/lgd_cluster_bsas.py"
+  },
+  "score_name": "LightDock_0.9.4_fastdfire",
+  "score_direction": "higher_is_better",
+  "steps": 20,
+  "swarms": 4,
+  "glowworms": 50,
+  "cores": 1,
+  "top_poses": 3,
+  "random_seed": 42,
+  "random_seed_recording": "manifest_only_external_lightdock_cli",
+  "output_dir": "runs",
+  "source_type": "project_authored_synthetic"
+}

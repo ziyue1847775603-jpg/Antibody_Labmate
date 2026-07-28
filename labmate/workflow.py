@@ -185,6 +185,19 @@ def _artifact_role(relative: Path, *, execution_mode: str = "replay") -> str:
         return "offline_report"
     if relative.name == "candidate_ranking.csv":
         return "candidate_ranking"
+    if execution_mode == "benchmark_local":
+        if relative.name == "poses.csv":
+            return "benchmark_local_pose_ranking"
+        if relative.name == "benchmark_metrics.csv":
+            return "benchmark_local_reference_metrics"
+        if relative.name == "case_summary.csv":
+            return "benchmark_local_top_k_summary"
+        if relative.name == "job.json":
+            return "benchmark_local_configuration"
+        if relative.parts[0] == "work":
+            return "benchmark_local_docking_artifact"
+        if relative.parts[0] == "top_poses":
+            return "benchmark_local_structure_artifact"
     if relative.name == "interface_residues.csv":
         return "interface_residues"
     if relative.name == "candidates.fasta":
@@ -192,24 +205,32 @@ def _artifact_role(relative: Path, *, execution_mode: str = "replay") -> str:
     if relative.parts[0] == "inputs":
         return "validated_input"
     if relative.parts[0] == "docking":
+        if execution_mode == "benchmark_local":
+            return "benchmark_local_docking_artifact"
         return (
             "replay_docking_artifact"
             if execution_mode == "replay"
             else "live_local_docking_artifact"
         )
     if relative.parts[0] == "structures":
+        if execution_mode == "benchmark_local":
+            return "benchmark_local_structure_artifact"
         return (
             "replay_structure_artifact"
             if execution_mode == "replay"
             else "live_local_structure_artifact"
         )
     if relative.parts[0] == "analysis":
+        if execution_mode == "benchmark_local":
+            return "benchmark_local_analysis"
         return (
             "local_replay_analysis"
             if execution_mode == "replay"
             else "local_live_analysis"
         )
     if relative.parts[0] == "ranking":
+        if execution_mode == "benchmark_local":
+            return "benchmark_local_ranking"
         return (
             "local_replay_ranking"
             if execution_mode == "replay"

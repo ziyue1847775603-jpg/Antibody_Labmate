@@ -1,10 +1,22 @@
 # Antibody Labmate — CDR-to-Docking Workflow
 
-> **REPLAY DEMO + VERIFIED LIVE LOCAL CLI · NO LIVE REMOTE**
+> **REPLAY + VERIFIED LIVE LOCAL + IMPLEMENTED-UNVERIFIED BENCHMARK LOCAL · NO LIVE REMOTE**
 
 本版本保留 Phase 1 Replay MVP，并新增 Phase 2a Live Local CLI。Replay 接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行固定产物重放。运行时会重新完成 PDB 解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。
 
 Streamlit 页面仍只展示 Replay。CLI 另提供 `verified_live` 的 Live Local 路径：它调用用户自行安装的 ColabFold 与 LightDock；不会下载、捆绑或模拟这两个工具。该状态只覆盖 [`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md) 记录的本机小规模配置，不代表其他版本、参数或科学有效性。Live Remote 仍为 `unavailable`。
+
+CLI 还提供 Phase 2b `benchmark_local`：本地抗体 PDB 与抗原 PDB 直接进入用户独立安装的 LightDock，可选用天然复合物计算 RMSD、Fnat 和界面 precision/recall/F1。它跳过 ColabFold、不接受 FASTA、不联网。当前已完成代码测试与一次真实 LightDock 0.9.4 CC0 synthetic 软件集成 smoke，但尚未完成 DB5.5 科学 benchmark，状态固定为 `implemented_unverified`；详见 [`BENCHMARK_LOCAL.md`](BENCHMARK_LOCAL.md) 和 [`BENCHMARK_LOCAL_VALIDATION.md`](BENCHMARK_LOCAL_VALIDATION.md)。
+
+## Benchmark Local（真实 synthetic 集成已运行、科学未验证）
+
+复制 [`examples/benchmark_local`](examples/benchmark_local)，确认输入与软件权利，填写四个显式本地 executable 路径和 score direction 后运行：
+
+```bash
+labmate run project.json --mode benchmark_local
+```
+
+成功运行生成 `poses.csv`、`interface_residues.csv`、可选 `benchmark_metrics.csv`、`case_summary.csv`、自包含 HTML、manifest、规范化输入、Top pose PDB、日志和 ZIP。报告固定标记 `BENCHMARK LOCAL · COMPUTATIONAL DOCKING BENCHMARK · NOT BINDING OR AFFINITY EVIDENCE`。
 
 ## Live Local（已验证限定配置、CLI-only）
 
@@ -64,6 +76,8 @@ python -m pytest
 ```
 
 测试覆盖 CDR 标准化和非法字符、PDB 大小/链/MODEL/altloc、Replay 状态机与 fixture 哈希、真实 ColabFold 文件配对/链映射/pLDDT、LightDock GSO 行号/分数/pose 映射、界面接触与 clash、归一化边界、隐私清洗、HTML/manifest/ZIP，以及篡改拒绝路径。
+
+Benchmark Local 测试另覆盖 VH/VL、VHH、rights/URL/链映射拒绝、严格 PDB 结构检查、外部进程失败、score/pose 一一对应、人工可验证 RMSD/Fnat/界面指标以及 manifest 路径隐私。测试中的临时 executable 是明确的 test double，不是 LightDock，也不构成 live 验证。
 
 Streamlit 启动烟测：
 
@@ -189,6 +203,7 @@ RUN_ID/
 - ReplayBackend：`replay_only`，仅对 `demo_001` 的精确输入启用。
 - LightDockProvider：默认 docking provider 契约，`replay_only`。只实现固定 CSV/PDB schema 解析；调用 `dock()` 会抛出明确错误。
 - Live Local：`verified_live`，仅本机 CLI；验证范围为 ColabFold 1.6.2、离线 `single_sequence`、预装 multimer-v3 权重、外部 LightDock 0.9.4 和一候选小规模 smoke 参数。其他版本、MSA-backed 模式、评分函数、规模和科学有效性不在该状态范围内。
+- Benchmark Local：`implemented_unverified`，本地 PDB→外部 LightDock→界面与可选 reference 指标已实现，并完成一次记录在案的真实 LightDock 0.9.4 synthetic 软件集成 smoke；尚未完成 DB5.5 科学 benchmark。
 - Live Remote：`unavailable`。
 - ElliDockProvider/HDOCKProvider：Phase 1 不创建虚假 skeleton，也不出现在可运行选择框。
 - 普通 DiffDock：不属于蛋白–蛋白 docking 后端。
@@ -196,6 +211,8 @@ RUN_ID/
 ## 科学、隐私与合规声明
 
 本工作流生成的是计算候选与计算优先级排名。结构预测置信度、对接分数及几何接触分析不能证明真实结合、亲和力、特异性、安全性或治疗效果。任何实验、公开传播或商业使用均应由使用者完成必要的序列权利确认、风险评估和实验验证。
+
+PDB 数据许可与专利自由实施是两个不同问题；使用者负责输入数据权利、专利分析及所有外部软件授权。Schrödinger/PIPER 只能由具备许可的用户独立运行，作为外部商业对照；本仓库不调用、不捆绑其程序、脚本、License、密钥或专有输出。
 
 报告只写相对 artifact 路径和去标识化命令名，不写 token、API key、实际环境变量、用户名或本机绝对路径。Replay 不联网。已验证的 Live Local 配置使用 `single_sequence`，不向公共 MSA 服务发送序列；应用也不下载模型。
 
@@ -229,6 +246,7 @@ python -m scripts.package_project
 - 应用内 IgCraft 执行与模型验证；
 - ColabFold 公共或本地 MSA-backed 模式、模板模式、其他版本/模型、批量规模与性能；
 - LightDock 其他版本、评分函数、大规模参数、性能与任何 GPL 组合分发；
+- Benchmark Local 的 DB5.5 科学 benchmark、性能与跨版本可重复性；
 - ElliDock GPU/Linux；
 - HDOCK 与 Schrödinger（均未使用、未实现）；
 - PyMOL 渲染；
