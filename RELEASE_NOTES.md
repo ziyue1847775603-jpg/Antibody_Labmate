@@ -1,5 +1,28 @@
 # Release Notes
 
+## v0.3.0 — Benchmark Local (2026-07-28)
+
+- Replay remains the stable hash-exact synthetic demonstration mode.
+- Live Local remains the previously validated one-candidate synthetic WSL2
+  software-integration configuration. Its bounded `verified_live` label does
+  not extend to other tools, configurations, performance, or scientific
+  validity.
+- Added CLI-only `benchmark_local`, which skips ColabFold and accepts existing
+  antibody and antigen PDB structures plus an optional reference complex. It
+  supports VH/VL, VHH, multiple antigen chains, explicit chain mappings, pose
+  ranking, interface residues, optional reference metrics, Top 1/5/10
+  summaries, self-contained offline HTML, manifests, and run ZIPs.
+- A real external LightDock 0.9.4 CC0 synthetic software-integration smoke
+  completed successfully. LightDock remains a separately installed GPL-3.0
+  tool and is not bundled.
+- Benchmark Local remains `implemented_unverified`: no DB5.5 or other real
+  scientific benchmark, Schrödinger/PIPER comparison, ranking-quality study,
+  affinity claim, or experimental validation has been completed.
+- Live Remote remains unavailable and is not implemented.
+- All workflow results remain computational artifacts only; they do not prove
+  binding, affinity, binding free energy, specificity, safety, efficacy, or
+  experimental outcomes.
+
 ## v0.2.0 — Phase 2a Live Local (2026-07-27)
 
 - Added a CLI-only `--mode live_local` execution path for user-installed ColabFold and LightDock commands.

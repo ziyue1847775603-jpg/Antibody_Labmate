@@ -20,7 +20,7 @@ def test_version_and_streamlit_deployment_contract(project_root: Path) -> None:
     config = tomllib.loads((project_root / ".streamlit" / "config.toml").read_text(encoding="utf-8"))
     requirements = (project_root / "requirements.txt").read_text(encoding="utf-8").splitlines()
 
-    assert __version__ == project_version() == pyproject["project"]["version"] == "0.2.0"
+    assert __version__ == project_version() == pyproject["project"]["version"] == "0.3.0"
     assert pyproject["project"]["requires-python"] == ">=3.11,<3.13"
     assert config["server"] == {
         "headless": True,
@@ -44,6 +44,11 @@ def test_documentation_and_license_submission_contract(project_root: Path) -> No
     devpost = (project_root / "DEVPOST_PROJECT_DESCRIPTION.md").read_text(encoding="utf-8")
     license_text = (project_root / "LICENSE").read_text(encoding="utf-8")
     notices = (project_root / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    release_notes = (project_root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+    benchmark_docs = "\n".join(
+        (project_root / name).read_text(encoding="utf-8")
+        for name in ("BENCHMARK_LOCAL.md", "BENCHMARK_LOCAL_VALIDATION.md")
+    )
 
     assert ".\\.venv\\Scripts\\python.exe" in readme
     assert "Activate.ps1" not in readme
@@ -62,6 +67,19 @@ def test_documentation_and_license_submission_contract(project_root: Path) -> No
     assert "REPLAY · NOT LIVE COMPUTE" in devpost
     assert "It does not install, call, or imitate" in devpost
     assert "AI assistance disclosure" in devpost
+    assert "v0.3.0 — Benchmark Local" in release_notes
+    assert "implemented_unverified" in release_notes
+    assert "Live Remote remains unavailable" in release_notes
+
+    public_release_text = "\n".join((readme, release_notes, benchmark_docs, notices))
+    assert not re.search(r"(?<![A-Za-z0-9])[A-Za-z]:[\\\\/]", public_release_text)
+    assert not re.search(r"/(?:mnt|root|home)/", public_release_text, flags=re.IGNORECASE)
+    assert not re.search(
+        r"\b" + "LAP" + r"TOP-[A-Za-z0-9-]*\b",
+        public_release_text,
+        flags=re.IGNORECASE,
+    )
+    assert not re.search(r"(?:sk-|gh[pousr]_)[A-Za-z0-9_-]{20,}", public_release_text)
 
 
 def test_fixture_paths_are_safe_on_posix_and_windows(project_root: Path) -> None:
@@ -95,7 +113,7 @@ def test_clean_release_zip_and_source_checksums(
     monkeypatch.setattr(package_project, "ROOT", isolated_root)
 
     output = package_project.build(
-        tmp_path / "Antibody_Labmate_Phase2a_Live_Local_v0.2.0.zip"
+        tmp_path / "Antibody_Labmate_Phase2b_Benchmark_Local_v0.3.0.zip"
     )
     prefix = f"{project_root.name}/"
 

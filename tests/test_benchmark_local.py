@@ -557,5 +557,6 @@ def test_capability_is_implemented_unverified_and_legacy_fields_remain() -> None
     assert capabilities["benchmark_local"]["status"] == "implemented_unverified"
     assert capabilities["replay"]["status"] == "replay_only"
     assert capabilities["live_local"]["status"] == "verified_live"
+    assert capabilities["live_remote"]["status"] == "unavailable"
     assert "lightdock_replay_parser" in capabilities
     assert "lightdock_live_runner" in capabilities
