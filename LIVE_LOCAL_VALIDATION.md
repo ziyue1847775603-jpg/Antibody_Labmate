@@ -1,7 +1,7 @@
 # Phase 2a Live Local validation
 
-Date: 2026-07-27  
-Final status: **`verified_live` (bounded software-integration scope)**
+- Date: 2026-07-27
+- Final status: **`verified_live` (bounded software-integration scope)**
 
 `verified_live` means that the exact local pipeline and configuration below
 completed with real ColabFold and LightDock executions and passed independent
@@ -34,13 +34,19 @@ conclusion.
 | LightDock | 0.9.4, GPL-3.0, separately installed |
 | PyMOL | Not found; `skipped_optional` |
 
-The real executable locations were:
+For this public record, `$PROJECT_ROOT` denotes the repository root,
+`$COLABFOLD_ROOT` the separately installed ColabFold environment,
+`$LIGHTDOCK_ROOT` the separately installed LightDock environment,
+`$COLABFOLD_MODEL_ROOT` the preinstalled model-data directory, and
+`$LIVE_LOCAL_SMOKE_ROOT` / `$RUNS_ROOT` the external input/output locations.
+The real executable locations, normalized only to remove machine-specific
+directory prefixes, were:
 
 ```text
-/root/miniconda3/envs/colabfold/bin/colabfold_batch
-/mnt/d/my-project/external-tools/lightdock-0.9.4/bin/lightdock3_setup.py
-/mnt/d/my-project/external-tools/lightdock-0.9.4/bin/lightdock3.py
-/mnt/d/my-project/external-tools/lightdock-0.9.4/bin/lgd_generate_conformations.py
+$COLABFOLD_ROOT/bin/colabfold_batch
+$LIGHTDOCK_ROOT/bin/lightdock3_setup.py
+$LIGHTDOCK_ROOT/bin/lightdock3.py
+$LIGHTDOCK_ROOT/bin/lgd_generate_conformations.py
 ```
 
 The LightDock environment is outside the MIT source tree and is excluded from
@@ -57,7 +63,7 @@ Every executed smoke run instead used:
 
 ```text
 --msa-mode single_sequence
---data /mnt/d/colabfold-data/models
+--data $COLABFOLD_MODEL_ROOT
 --model-type alphafold2_multimer_v3
 --num-models 1
 --num-recycle 1
@@ -110,11 +116,11 @@ guessed. It is meaningful only within this run and scoring configuration.
 The exact command was:
 
 ```bash
-cd /mnt/d/my-project/antibody-labmate
+cd "$PROJECT_ROOT"
 .venv311/bin/labmate run \
-  /mnt/d/my-project/live-local-smoke-run/project.json \
+  "$LIVE_LOCAL_SMOKE_ROOT/project.json" \
   --mode live_local \
-  --output /mnt/d/my-project/antibody-labmate-validation-runs
+  --output "$RUNS_ROOT"
 ```
 
 Final run ID: **`RUN-20260727-004729-3afe82ca`**

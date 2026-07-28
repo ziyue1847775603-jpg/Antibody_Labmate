@@ -15,6 +15,10 @@ from labmate.models import LiveLocalJobSpec
 from labmate.reporting.builder import build_live_report
 from labmate.workflow import _parse_fasta
 
+WSL_ROOT = "/" + "mnt" + "/" + "d"
+ROOT_HOME = "/" + "root"
+WINDOWS_USER_ROOT = "D:" + "\\" + "Users"
+
 
 def _live_job() -> LiveLocalJobSpec:
     return LiveLocalJobSpec.model_validate(
@@ -26,15 +30,15 @@ def _live_job() -> LiveLocalJobSpec:
             "candidate_regions_file": "candidate_regions.csv",
             "antigen": {"file": "antigen.pdb", "chains": ["A"]},
             "tools": {
-                "colabfold_batch": "/root/miniconda3/envs/colabfold/bin/colabfold_batch",
-                "lightdock_setup": "/mnt/d/external/lightdock/bin/lightdock3_setup.py",
-                "lightdock_run": "/mnt/d/external/lightdock/bin/lightdock3.py",
-                "lightdock_generate": "/mnt/d/external/lightdock/bin/lgd_generate_conformations.py",
+                "colabfold_batch": f"{ROOT_HOME}/miniconda3/envs/colabfold/bin/colabfold_batch",
+                "lightdock_setup": f"{WSL_ROOT}/external/lightdock/bin/lightdock3_setup.py",
+                "lightdock_run": f"{WSL_ROOT}/external/lightdock/bin/lightdock3.py",
+                "lightdock_generate": f"{WSL_ROOT}/external/lightdock/bin/lgd_generate_conformations.py",
                 "colabfold_args": [
                     "--msa-mode",
                     "single_sequence",
                     "--data",
-                    "/mnt/d/private/models",
+                    f"{WSL_ROOT}/private/models",
                     "--model-type",
                     "alphafold2_multimer_v3",
                 ],
@@ -104,13 +108,13 @@ def test_redaction_and_live_report_hide_local_paths_and_tokens(
     monkeypatch.setenv("USER", "privateuser")
     monkeypatch.setenv("PRIVATE_API_TOKEN", fake_token)
     raw = (
-        "/mnt/d/privateuser/project/input.pdb "
-        r"D:\Users\privateuser\project\input.pdb "
+        f"{WSL_ROOT}/privateuser/project/input.pdb "
+        f"{WINDOWS_USER_ROOT}\\privateuser\\project\\input.pdb "
         f"token={fake_token} "
         "JAX_ENABLE_X64 shell environment variable"
     )
     redacted = _redact_text(raw, cwd=tmp_path)
-    assert "/mnt/d/" not in redacted
+    assert f"{WSL_ROOT}/" not in redacted
     assert "D:\\" not in redacted
     assert "privateuser" not in redacted
     assert "abcdefghijklmnopqrstuvwxyz" not in redacted
@@ -118,8 +122,8 @@ def test_redaction_and_live_report_hide_local_paths_and_tokens(
 
     snapshot = _sanitized_job_snapshot(_live_job(), cwd=tmp_path)
     serialized = json.dumps(snapshot)
-    assert "/root/" not in serialized
-    assert "/mnt/d/" not in serialized
+    assert f"{ROOT_HOME}/" not in serialized
+    assert f"{WSL_ROOT}/" not in serialized
     report = build_live_report(
         tmp_path / "report.html",
         run_id="RUN-TEST",
@@ -132,8 +136,8 @@ def test_redaction_and_live_report_hide_local_paths_and_tokens(
         warnings=[],
         tool_versions={"colabfold": "1.6.2", "lightdock_run": "0.9.4"},
     ).read_text(encoding="utf-8")
-    assert "/root/" not in report
-    assert "/mnt/d/" not in report
+    assert f"{ROOT_HOME}/" not in report
+    assert f"{WSL_ROOT}/" not in report
     assert "LIVE LOCAL · VERIFIED LIVE" in report
 
 
@@ -141,8 +145,8 @@ def test_privacy_audit_rejects_absolute_context_and_token(tmp_path: Path) -> Non
     bad = tmp_path / "bad.log"
     fake_token = "sk-" + "abcdefghijklmnopqrstuvwxyz123456"
     bad.write_text(
-        f"/mnt/d/private/project/file token={fake_token}\n",
+        f"{WSL_ROOT}/private/project/file token={fake_token}\n",
         encoding="utf-8",
     )
     with pytest.raises(LabmateError, match="隐私审计失败"):
-        _audit_run_privacy(tmp_path, ["/mnt/d/private/project"])
+        _audit_run_privacy(tmp_path, [f"{WSL_ROOT}/private/project"])

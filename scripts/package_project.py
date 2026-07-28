@@ -194,7 +194,7 @@ def main() -> int:
         "output",
         nargs="?",
         type=Path,
-        default=ROOT.parent / f"Antibody_Labmate_Phase2a_Live_Local_v{project_version()}.zip",
+        default=ROOT.parent / f"Antibody_Labmate_Phase2b_Benchmark_Local_v{project_version()}.zip",
     )
     args = parser.parse_args()
     print(build(args.output))
