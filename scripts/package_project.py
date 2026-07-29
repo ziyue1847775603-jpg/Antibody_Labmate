@@ -23,10 +23,20 @@ EXCLUDED_PARTS = {
     ".idea",
     ".vscode",
     "__pycache__",
+    ".cache",
+    ".conda",
     "build",
+    "checkpoints",
+    "database",
+    "databases",
     "dist",
     "htmlcov",
+    "models",
+    "params",
     "runs",
+    "uploads",
+    "user_uploads",
+    "wandb",
 }
 
 FORBIDDEN_FILENAMES = {
@@ -39,6 +49,27 @@ FORBIDDEN_FILENAMES = {
     "service-account.json",
 }
 FORBIDDEN_SUFFIXES = {".key", ".p12", ".pem", ".pfx"}
+FORBIDDEN_MODEL_OR_OUTPUT_SUFFIXES = {
+    ".ckpt",
+    ".onnx",
+    ".pickle",
+    ".pkl",
+    ".pt",
+    ".pth",
+    ".safetensors",
+}
+REQUIRED_RELEASE_PATHS = {
+    ".dockerignore",
+    "Dockerfile",
+    "docker-compose.yml",
+    "docs/docker.md",
+    "labmate/run.py",
+    "labmate/backends/base.py",
+    "labmate/backends/registry.py",
+    "labmate/backends/replay.py",
+    "labmate/backends/colabfold.py",
+    "labmate/backends/igfold.py",
+}
 HIGH_CONFIDENCE_SECRET_PATTERNS = {
     "private_key": re.compile(rb"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     "openai_key": re.compile(rb"sk-[A-Za-z0-9_-]{20,}"),
@@ -112,10 +143,25 @@ def sha256(path: Path) -> str:
 
 
 def audit_release_files(files: list[Path]) -> None:
+    relative_paths = {
+        path.relative_to(ROOT).as_posix()
+        for path in files
+    }
+    missing = sorted(REQUIRED_RELEASE_PATHS - relative_paths)
+    if missing:
+        raise RuntimeError(
+            "Release is missing required architecture files: "
+            + ", ".join(missing)
+        )
     for path in files:
         relative = path.relative_to(ROOT)
         if path.name.lower() in FORBIDDEN_FILENAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
             raise RuntimeError(f"Release refuses secret-bearing filename: {relative.as_posix()}")
+        if path.suffix.lower() in FORBIDDEN_MODEL_OR_OUTPUT_SUFFIXES:
+            raise RuntimeError(
+                "Release refuses model or generated-output file: "
+                f"{relative.as_posix()}"
+            )
         data = path.read_bytes()
         for label, pattern in HIGH_CONFIDENCE_SECRET_PATTERNS.items():
             if pattern.search(data):
@@ -141,6 +187,10 @@ def audit_archive(output: Path) -> None:
             suffix = Path(name).suffix.lower()
             if basename in FORBIDDEN_FILENAMES or suffix in FORBIDDEN_SUFFIXES:
                 raise RuntimeError(f"Secret-bearing filename entered release ZIP: {name}")
+            if suffix in FORBIDDEN_MODEL_OR_OUTPUT_SUFFIXES:
+                raise RuntimeError(
+                    f"Model or generated-output file entered release ZIP: {name}"
+                )
             data = archive.read(name)
             for label, pattern in HIGH_CONFIDENCE_SECRET_PATTERNS.items():
                 if pattern.search(data):
@@ -194,7 +244,8 @@ def main() -> int:
         "output",
         nargs="?",
         type=Path,
-        default=ROOT.parent / f"Antibody_Labmate_Phase2b_Benchmark_Local_v{project_version()}.zip",
+        default=ROOT.parent
+        / f"Antibody_Labmate_Backend_Architecture_v{project_version()}.zip",
     )
     args = parser.parse_args()
     print(build(args.output))

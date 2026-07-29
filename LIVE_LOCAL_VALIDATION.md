@@ -208,9 +208,92 @@ Final run ID: **`RUN-20260727-004729-3afe82ca`**
 - Streamlit headless startup: health endpoint returned HTTP 200 / `ok`; the
   process was then stopped.
 
+## ColabFold Prediction Backend Smoke Test
+
+- Date: 2026-07-29
+- Operating system: WSL2, Ubuntu 26.04
+- GPU: NVIDIA GeForce RTX 5070 Ti Laptop GPU, 12,227 MiB
+- Backend: `ColabFoldBackend` (`prediction-only`)
+- ColabFold: 1.6.2 (`alphafold-colabfold` 2.3.18)
+- Environment Python: 3.11.15
+- Input type: one complete VH/VL pair, encoded as a two-chain
+  `VH:VL` ColabFold multimer FASTA
+- Output root: `$PROJECT_ROOT/runs/validation/`
+
+The project CLI invoked the real external executable through
+`python -m labmate.run`; no mock, Replay fixture, antigen, or docking stage was
+used. Machine-specific prefixes are normalized below:
+
+```bash
+$PROJECT_ROOT/.venv311/bin/python -m labmate.run \
+  --prediction-backend colabfold \
+  --heavy-chain "<complete VH>" \
+  --light-chain "<complete VL>" \
+  --colabfold-executable "$COLABFOLD_ROOT/bin/colabfold_batch" \
+  --colabfold-model-data "$COLABFOLD_MODEL_ROOT" \
+  --output "$PROJECT_ROOT/runs/validation/colabfold_backend_smoke_20260729_1625"
+```
+
+Parameters were `single_sequence`, preinstalled model data,
+`alphafold2_multimer_v3`, one model, one recycle, zero relaxation, random seed
+0, unified-memory disabled, and `compile-mode=fast`. The installed help
+confirmed every option. Although ColabFold's generated `config.json` retains
+an unused default `host_url`, the recorded mode is `single_sequence`, the A3M
+contains only the two supplied chains, and no MSA query stage appears in the
+execution log.
+
+Observed execution:
+
+- Start: 2026-07-29 16:25:09 +08:00
+- ColabFold completion: 2026-07-29 16:27:29 +08:00
+- Exit code: 0
+- GPU execution was reported by ColabFold and independently observed with
+  `nvidia-smi`.
+- Three read-only samples observed approximately 5,453–5,685 MiB GPU memory;
+  these samples are not a measured peak.
+- JAX initially logged several failed large-memory allocation attempts before
+  falling back and completing. The PDB was produced successfully. Post-run
+  hardening makes future `PredictionResult` objects surface this condition as
+  a non-fatal warning.
+
+Result validation:
+
+- `backend_name`: `colabfold`
+- `status`: `succeeded`
+- `return_code`: 0
+- Original run `warnings`: empty; the allocation-warning surfacing fix was
+  added after inspecting this run and regression-tested without repeating the
+  scientific computation.
+- Output PDB:
+  `colabfold/antibody_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000.pdb`
+- Output PDB size: 149,202 bytes
+- Output PDB SHA-256:
+  `a00efa82242ab3d5fb80bbdf1949b113cf8e46a432333f7e95a759f9f2371fe6`
+- The PDB contains 1,837 `ATOM`/`HETATM` rows and exactly chains A/B.
+- Independently parsed chain A exactly matches the 125-residue VH; chain B
+  exactly matches the 117-residue VL.
+- The canonical PDB path remains inside the requested output directory.
+- Output discovery found exactly one rank-1 PDB and no symbolic links.
+- The input FASTA SHA-256 is
+  `4d803605c11f3b8edd617fd2da6fcab0be30250d011f36a898c30b1e0f7cc751`.
+- Score JSON, predicted-aligned-error JSON, A3M, plots, config, citation,
+  stdout log, and stderr log were also produced. Logs were path-redacted and
+  kept outside the source/release scope under ignored `runs/`.
+
+This is a **local ColabFold prediction backend software-integration smoke
+test**. It verifies one wrapper invocation, GPU use, two-chain FASTA handling,
+bounded output discovery, and production of a non-empty PDB. It is not a
+DB5.5 scientific benchmark, docking validation, accuracy proof, production
+readiness statement, affinity/free-energy result, or experimental validation.
+
 ## Not validated
 
 - IgCraft execution inside the application;
+- general antibody accuracy or real-dataset structure benchmarking;
+- IgFold inference through the new prediction-only backend;
+- antigen docking from the prediction-only ColabFold result;
+- Docker GPU/ColabFold execution;
+- concurrent users or long-running recovery;
 - public or local MSA-backed ColabFold modes, templates, other model/tool
   versions, larger batches, performance, or reproducibility across machines;
 - other LightDock scoring functions or production-scale docking;

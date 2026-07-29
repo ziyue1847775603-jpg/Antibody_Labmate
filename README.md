@@ -4,9 +4,66 @@
 
 本版本保留 Phase 1 Replay MVP，并新增 Phase 2a Live Local CLI。Replay 接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行固定产物重放。运行时会重新完成 PDB 解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。
 
-Streamlit 页面仍只展示 Replay。CLI 另提供 `verified_live` 的 Live Local 路径：它调用用户自行安装的 ColabFold 与 LightDock；不会下载、捆绑或模拟这两个工具。该状态只覆盖 [`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md) 记录的本机小规模配置，不代表其他版本、参数或科学有效性。Live Remote 仍为 `unavailable`。
+Streamlit 页面提供结构预测后端选择说明，但为了不把固定结果套用到新输入，网页仍只执行 Replay。CLI 另提供 `verified_live` 的 Live Local 路径：它调用用户自行安装的 ColabFold 与 LightDock；不会下载、捆绑或模拟这两个工具。该状态只覆盖 [`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md) 记录的本机小规模配置，不代表其他版本、参数或科学有效性。Live Remote 仍为 `unavailable`。
 
 CLI 还提供 Phase 2b `benchmark_local`：本地抗体 PDB 与抗原 PDB 直接进入用户独立安装的 LightDock，可选用天然复合物计算 RMSD、Fnat 和界面 precision/recall/F1。它跳过 ColabFold、不接受 FASTA、不联网。当前已完成代码测试与一次真实 LightDock 0.9.4 CC0 synthetic 软件集成 smoke，但尚未完成 DB5.5 科学 benchmark，状态固定为 `implemented_unverified`；详见 [`BENCHMARK_LOCAL.md`](BENCHMARK_LOCAL.md) 和 [`BENCHMARK_LOCAL_VALIDATION.md`](BENCHMARK_LOCAL_VALIDATION.md)。
+
+## Prediction Backends
+
+结构预测现在通过统一的 `PredictionBackend` 接口返回
+`PredictionResult`，下游只读取 PDB 路径、后端名称、状态、元数据和警告。
+可用 registry 名称为 `replay`、`colabfold` 和 `igfold`；未知名称会明确报错。
+
+- **Replay (Demo)**：默认后端。完全离线、确定性，只接受与
+  `fixtures/demo_001` 精确匹配的合成 VH/VL，并保留原有 fixture
+  SHA-256 验证。完整 Replay workflow 与既有输出保持兼容。
+- **ColabFold**：AlphaFold2-based 本机 wrapper。只调用用户安装的
+  `colabfold_batch`，使用本机预装模型数据和 `single_sequence` 模式；
+  不捆绑源码、数据库或权重，也不联系公共 MSA 服务。默认使用一个
+  model、一个 recycle、零 relaxation 和 `compile-mode=fast`，适合受控的
+  prediction-only smoke，不代表生产质量参数。
+- **IgFold**：抗体专用的快速本机 wrapper，支持 VH 和可选 VL。
+  IgFold 包及所需模型必须由用户预先安装；项目不会下载模型。
+
+预测阶段可以独立运行；当前外部预测插件不会被错误接到固定 Replay
+docking 产物上。既有完整真实计算路径仍是经过限定配置验证的
+`live_local`，Benchmark Local 则直接接收现成 PDB。
+
+```bash
+# Replay：完整、哈希严格匹配的 demo workflow
+labmate run fixtures/demo_001/project.yaml \
+  --mode replay \
+  --prediction-backend replay \
+  --fixture demo_001
+
+# ColabFold：本机离线预测阶段
+labmate predict \
+  --prediction-backend colabfold \
+  --heavy-chain "FULL_VH_SEQUENCE" \
+  --light-chain "FULL_VL_SEQUENCE" \
+  --colabfold-model-data "$COLABFOLD_DATA_DIR" \
+  --output runs/colabfold_prediction
+
+# IgFold：本机抗体结构预测阶段
+labmate predict \
+  --prediction-backend igfold \
+  --heavy-chain "FULL_VH_SEQUENCE" \
+  --light-chain "FULL_VL_SEQUENCE" \
+  --output runs/igfold_prediction
+```
+
+`python -m labmate.run` 提供相同的 prediction-only 参数入口。Docker
+镜像固定为无需 GPU 的 Replay 环境；运行 `docker compose up --build`
+即可启动 Streamlit。Live/GPU 环境所需的 NVIDIA Container Toolkit、
+外部数据库、权重与科学工具不进入镜像，详见
+[`docs/docker.md`](docs/docker.md)。
+
+2026-07-29 已在宿主 WSL2 环境用真实 ColabFold 1.6.2 和预装权重运行
+一个 VH/VL prediction-only smoke：wrapper 生成正确的 `VH:VL` 两链
+FASTA，GPU 计算完成并生成唯一、非空、A/B 两链的 rank-1 PDB。该记录只
+证明本机软件集成可以运行；不证明抗体结构准确性、docking、DB5.5
+benchmark、亲和力或实验结果。完整命令、PDB SHA-256、显存采样和限制见
+[`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md#colabfold-prediction-backend-smoke-test)。
 
 ## Benchmark Local（真实 synthetic 集成已运行、科学未验证）
 
@@ -157,7 +214,12 @@ antibody-labmate/
 │   ├── state.py
 │   ├── workflow.py
 │   ├── validators/
-│   ├── backends/replay.py
+│   ├── backends/
+│   │   ├── base.py
+│   │   ├── registry.py
+│   │   ├── replay.py
+│   │   ├── colabfold.py
+│   │   └── igfold.py
 │   ├── docking/lightdock.py
 │   ├── analysis/
 │   └── reporting/
@@ -165,6 +227,9 @@ antibody-labmate/
 ├── .streamlit/config.toml
 ├── scripts/build_demo_fixture.py
 ├── tests/
+├── Dockerfile
+├── docker-compose.yml
+├── docs/docker.md
 ├── DEPLOYMENT.md
 ├── RELEASE_NOTES.md
 ├── DEMO_SCRIPT.md

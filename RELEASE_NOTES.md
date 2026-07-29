@@ -1,5 +1,31 @@
 # Release Notes
 
+## Unreleased — Pluggable Prediction Backends
+
+- Added a provider-neutral `PredictionBackend` / `PredictionResult` contract
+  and registry with `replay`, `colabfold`, and `igfold` providers.
+- Preserved the complete Replay workflow, strict fixture/input hash checks,
+  deterministic outputs, and existing ranking/reporting contracts.
+- Added prediction-only local wrappers for user-installed ColabFold and
+  IgFold environments. They do not download or bundle source, model weights,
+  databases, or third-party executables.
+- Added backend selection to the CLI and explanatory selection to Streamlit.
+  The web application remains Replay-only and never silently falls back from
+  a selected local engine to Replay.
+- Added a Python 3.11 Replay Docker deployment. The image deliberately excludes
+  ColabFold, IgFold, LightDock, model weights, databases, user uploads, and
+  runtime outputs.
+- Completed one real, host-side WSL2 ColabFold 1.6.2 prediction-only smoke
+  using a single VH/VL pair, preinstalled weights, one model, one recycle, and
+  no relaxation. It produced one non-empty two-chain PDB through the new
+  wrapper. This is software-integration evidence only; it is not scientific,
+  docking, benchmark, production, Docker-GPU, or remote-worker validation.
+- Hardened prediction output discovery against symbolic links and
+  out-of-directory PDBs, bounded stdout/stderr metadata while retaining
+  path-redacted logs, surfaced recovered GPU allocation warnings, and changed
+  concrete backend package exports to lazy loading to prevent fresh-process
+  workflow import cycles.
+
 ## v0.3.0 — Benchmark Local (2026-07-28)
 
 - Replay remains the stable hash-exact synthetic demonstration mode.

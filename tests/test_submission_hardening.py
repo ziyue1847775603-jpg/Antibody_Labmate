@@ -12,7 +12,11 @@ import pytest
 
 from labmate import __version__
 from scripts import package_project
-from scripts.package_project import EXCLUDED_PARTS, project_version
+from scripts.package_project import (
+    EXCLUDED_PARTS,
+    REQUIRED_RELEASE_PATHS,
+    project_version,
+)
 
 
 def test_version_and_streamlit_deployment_contract(project_root: Path) -> None:
@@ -125,6 +129,10 @@ def test_clean_release_zip_and_source_checksums(
         assert all(not (set(PurePosixPath(name).parts) & EXCLUDED_PARTS) for name in names)
         assert all(not part.endswith(".egg-info") for name in names for part in PurePosixPath(name).parts)
         assert all(not name.endswith((".pyc", ".pyo", ".zip")) for name in names)
+        assert {
+            prefix + relative
+            for relative in REQUIRED_RELEASE_PATHS
+        }.issubset(names)
 
         checksum_name = prefix + "SOURCE_CHECKSUMS.sha256"
         archived_checksum = archive.read(checksum_name)
@@ -141,3 +149,58 @@ def test_clean_release_zip_and_source_checksums(
             name.removeprefix(prefix) for name in names if name != checksum_name
         }
     assert repository_checksum.read_bytes() == checksum_before
+
+
+def test_release_excludes_external_models_databases_and_uploads(
+    project_root: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    isolated_root = tmp_path / project_root.name
+    shutil.copytree(
+        project_root,
+        isolated_root,
+        ignore=shutil.ignore_patterns(*EXCLUDED_PARTS),
+    )
+    forbidden_directories = {
+        "models": "weights.ckpt",
+        "databases": "sequence.db",
+        "params": "params_model_1_multimer_v3.npz",
+        "uploads": "user_input.pdb",
+        "runs": "prediction.pdb",
+    }
+    for directory, filename in forbidden_directories.items():
+        target = isolated_root / directory
+        target.mkdir()
+        (target / filename).write_bytes(b"must not ship")
+    monkeypatch.setattr(package_project, "ROOT", isolated_root)
+
+    output = package_project.build(tmp_path / "clean.zip")
+    with zipfile.ZipFile(output) as archive:
+        names = archive.namelist()
+    assert not any(
+        part in forbidden_directories
+        for name in names
+        for part in PurePosixPath(name).parts
+    )
+
+
+def test_release_refuses_model_weight_file_in_source_scope(
+    project_root: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    isolated_root = tmp_path / project_root.name
+    shutil.copytree(
+        project_root,
+        isolated_root,
+        ignore=shutil.ignore_patterns(*EXCLUDED_PARTS),
+    )
+    (isolated_root / "unexpected_weights.ckpt").write_bytes(b"must not ship")
+    monkeypatch.setattr(package_project, "ROOT", isolated_root)
+
+    with pytest.raises(
+        RuntimeError,
+        match="refuses model or generated-output file",
+    ):
+        package_project.build(tmp_path / "rejected.zip")

@@ -16,6 +16,7 @@ from typing import Any
 from labmate import __version__
 from labmate.analysis.interface import analyze_interfaces
 from labmate.analysis.ranking import build_candidate_metrics, rank_candidates
+from labmate.backends.base import PredictionBackend, PredictionResult
 from labmate.config import DEFAULT_INTERFACE_CONFIG, SCIENTIFIC_LIMITATION
 from labmate.docking.lightdock import LightDockProvider, ParsedDockingPose
 from labmate.errors import FixtureIntegrityError
@@ -269,7 +270,32 @@ def _safe_zip(run_dir: Path, zip_path: Path) -> None:
             archive.write(path, arcname=relative.as_posix())
 
 
-def execute_replay(*, job: JobSpec, antigen_bytes: bytes, fixture_root: Path, output_root: Path) -> RunResult:
+def predict_structure(
+    *,
+    backend: PredictionBackend,
+    heavy_chain: str,
+    light_chain: str | None,
+    antigen_pdb: Path | None = None,
+    output_dir: Path | None = None,
+) -> PredictionResult:
+    """Run one provider-neutral structure-prediction stage."""
+
+    return backend.predict(
+        heavy_chain=heavy_chain,
+        light_chain=light_chain,
+        antigen_pdb=antigen_pdb,
+        output_dir=output_dir,
+    )
+
+
+def execute_replay(
+    *,
+    job: JobSpec,
+    antigen_bytes: bytes,
+    fixture_root: Path,
+    output_root: Path,
+    prediction_backend: PredictionBackend,
+) -> RunResult:
     """Execute parser/analysis/ranking/reporting over a verified fixed fixture."""
 
     output_root = output_root.resolve()
@@ -348,6 +374,37 @@ def execute_replay(*, job: JobSpec, antigen_bytes: bytes, fixture_root: Path, ou
         input_hashes={"candidates_fasta_sha256": sha256_file(root_fasta)},
         notes=["Copied fixed project-authored synthetic structure artifacts; ColabFold not executed"],
     )
+    if prediction_backend.name != "replay":
+        raise FixtureIntegrityError(
+            "Replay workflow requires the replay prediction backend; use the prediction-only CLI for local engines"
+        )
+    for candidate_id in sorted(candidates):
+        prediction_result = predict_structure(
+            backend=prediction_backend,
+            heavy_chain=candidates[candidate_id]["H"],
+            light_chain=candidates[candidate_id]["L"],
+        )
+        if prediction_result.status != "succeeded" or prediction_result.pdb_path is None:
+            raise FixtureIntegrityError(
+                f"Replay prediction backend failed for {candidate_id}"
+            )
+        if prediction_result.metadata.get("candidate_id") != candidate_id:
+            raise FixtureIntegrityError(
+                f"Replay prediction candidate mapping mismatch for {candidate_id}"
+            )
+        expected_pdb = (
+            fixture_root
+            / "colabfold_output"
+            / candidate_id
+            / "ranked_1.pdb"
+        )
+        if (
+            not prediction_result.pdb_path.is_file()
+            or sha256_file(prediction_result.pdb_path) != sha256_file(expected_pdb)
+        ):
+            raise FixtureIntegrityError(
+                f"Replay prediction artifact mismatch for {candidate_id}"
+            )
     structure_files = _copy_tree(fixture_root / "colabfold_output", run_dir / "structures" / "fixture_output")
     # Promote the uniform candidate directories into structures/CAND-* for downstream mapping.
     promoted_structure_files: list[Path] = []

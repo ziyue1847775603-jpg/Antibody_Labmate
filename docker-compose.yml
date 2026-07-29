@@ -1,0 +1,10 @@
+services:
+  labmate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./runs:/app/runs
+    restart: unless-stopped

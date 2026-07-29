@@ -20,6 +20,20 @@ ROOT = Path(__file__).resolve().parent
 FIXTURE_ROOT = ROOT / "fixtures" / "demo_001"
 PROJECT_FILE = FIXTURE_ROOT / "project.yaml"
 RUNS_ROOT = ROOT / "runs"
+PREDICTION_BACKEND_OPTIONS = {
+    "replay": (
+        "Replay (Demo)",
+        "Deterministic offline demonstration",
+    ),
+    "colabfold": (
+        "ColabFold",
+        "AlphaFold2 based local prediction",
+    ),
+    "igfold": (
+        "IgFold",
+        "Antibody-specialized prediction",
+    ),
+}
 
 
 def read_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -122,6 +136,18 @@ with new_run_tab:
         except LabmateError as exc:
             st.error(str(exc))
         st.text_input("Mode", value="REPLAY", disabled=True)
+        prediction_backend_name = st.selectbox(
+            "Structure prediction backend",
+            options=tuple(PREDICTION_BACKEND_OPTIONS),
+            index=0,
+            format_func=lambda name: PREDICTION_BACKEND_OPTIONS[name][0],
+        )
+        st.caption(PREDICTION_BACKEND_OPTIONS[prediction_backend_name][1])
+        if prediction_backend_name != "replay":
+            st.warning(
+                "This engine is exposed by the local prediction CLI. "
+                "The web workflow remains the hash-verified Replay demo."
+            )
         st.text_input("DockingProvider", value="LightDockProvider · replay_only", disabled=True)
         st.number_input("Candidate count", value=4, disabled=True)
         st.number_input("Random seed", value=42, disabled=True)
@@ -130,7 +156,11 @@ with new_run_tab:
         "我确认本次加载的是项目自建 CC0 合成 demo，并理解输出不是实验结合、亲和力、疗效或安全性结论。",
         value=True,
     )
-    if st.button("Run verified REPLAY", type="primary", disabled=not rights_confirmed):
+    if st.button(
+        "Run verified REPLAY",
+        type="primary",
+        disabled=not rights_confirmed or prediction_backend_name != "replay",
+    ):
         payload = demo_job.model_dump(mode="json")
         payload["antibody"].update(
             {
