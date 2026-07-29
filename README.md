@@ -33,6 +33,12 @@ CLI 还提供 Phase 2b `benchmark_local`：本地抗体 PDB 与抗原 PDB 直接
 docking 产物上。既有完整真实计算路径仍是经过限定配置验证的
 `live_local`，Benchmark Local 则直接接收现成 PDB。
 
+Prediction-only PDB 可先经严格的后端无关 `PredictionArtifact` / `DockingInput`
+adapter 验证，再交给未来的本机 docking adapter。该层已对既有 ColabFold 与
+IgFold synthetic PDB 做 dry handoff；它不运行 docking、不统一 confidence，也不
+改变 Replay 或现有 ColabFold-only Live Local ranking。详见
+[`docs/prediction_docking_adapter.md`](docs/prediction_docking_adapter.md)。
+
 ```bash
 # Replay：完整、哈希严格匹配的 demo workflow
 labmate run fixtures/demo_001/project.yaml \

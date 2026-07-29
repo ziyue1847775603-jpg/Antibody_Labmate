@@ -69,6 +69,7 @@ REQUIRED_RELEASE_PATHS = {
     "labmate/backends/replay.py",
     "labmate/backends/colabfold.py",
     "labmate/backends/igfold.py",
+    "labmate/prediction_artifact.py",
     "labmate/workers/__init__.py",
     "labmate/workers/igfold_worker.py",
 }
