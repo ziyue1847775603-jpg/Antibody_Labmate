@@ -69,6 +69,8 @@ REQUIRED_RELEASE_PATHS = {
     "labmate/backends/replay.py",
     "labmate/backends/colabfold.py",
     "labmate/backends/igfold.py",
+    "labmate/workers/__init__.py",
+    "labmate/workers/igfold_worker.py",
 }
 HIGH_CONFIDENCE_SECRET_PATTERNS = {
     "private_key": re.compile(rb"-----BEGIN [A-Z ]*PRIVATE KEY-----"),

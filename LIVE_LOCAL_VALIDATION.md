@@ -286,11 +286,89 @@ bounded output discovery, and production of a non-empty PDB. It is not a
 DB5.5 scientific benchmark, docking validation, accuracy proof, production
 readiness statement, affinity/free-energy result, or experimental validation.
 
+## IgFold Prediction Backend Smoke Test
+
+- Date: 2026-07-29
+- Operating system: WSL2, Ubuntu 26.04
+- GPU: NVIDIA GeForce RTX 5070 Ti Laptop GPU, 12,227 MiB
+- Backend: `IgFoldBackend` (`prediction-only`)
+- Status: **succeeded — bounded local software-integration smoke**
+- IgFold: official PyPI release 0.4.0
+- AntiBERTy: official PyPI release 0.1.3
+- Environment: separate `antibody-labmate-igfold-legacy` conda environment
+- Main-process Python: 3.11.15; worker Python: 3.10.20
+- PyTorch: 1.13.1+cpu; CUDA runtime: none; `torch.cuda.is_available()`: `False`
+- Transformers: 4.24.0; AntiBERTy: 0.1.3; Biopython: 1.79
+- Device used: CPU
+- Input: one paired complete VH/VL input, passed as independent `H` and `L`
+  dictionary entries; no antigen, scFv concatenation, Replay, ColabFold, mock,
+  refinement, renumbering, or docking; one IgFold model
+
+The legacy environment is isolated from the project Python 3.11 environment,
+the existing ColabFold environment, base Python, and system Python. It follows
+the relevant official IgFold 0.4.0 dependency era (notably PyTorch 1.13.1,
+Transformers 4.24.0, AntiBERTy 0.1.3, and Biopython 1.79); `pip check` passed.
+No PyRosetta was installed, and refinement and renumbering were both disabled.
+
+The successful invocation uses a fail-closed bridge. The Python 3.11 process
+validates input and creates a new empty output directory, then invokes a fixed,
+Python-3.10-compatible worker file with a parameter list and `shell=False`.
+The VH/VL values are stored in a private request JSON rather than process
+arguments. The worker accepts only schema version 1, exactly one model,
+relative PDB filename, standard paired sequences, and false refinement/
+renumbering flags. It returns a bounded response JSON with a relative filename;
+the parent rejects a nonzero exit, missing/invalid response, symbolic links,
+path escape, no-ATOM output, wrong chains, or sequence mismatch. Sensitive
+environment variables are not passed to the worker; stdout/stderr are retained
+only as path- and token-redacted logs under ignored `runs/`.
+
+```bash
+$PROJECT_ROOT/.venv311/bin/python -m labmate.run \
+  --prediction-backend igfold \
+  --igfold-python "$IGFOLD_PYTHON" \
+  --heavy-chain-file "$SMOKE_INPUT_ROOT/heavy.txt" \
+  --light-chain-file "$SMOKE_INPUT_ROOT/light.txt" \
+  --output "$RUNS_ROOT/igfold_bridge_backend_smoke_<UTC timestamp>/output"
+```
+
+The legacy environment used its already installed official-package weights;
+the bridge ran with offline Hugging Face/Transformers mode and performed no
+model download. Its cache, environment, request/response JSON, logs, and PDB
+remain outside source control, Docker, and the release ZIP. IgFold displayed
+the JHU Academic Software License non-commercial-use notice during startup.
+
+The direct API preflight and formal bridge command both completed with exit
+code 0. IgFold reported 2.14 seconds for folding; the end-to-end bridge smoke
+completed in about 11 seconds including process startup and validation. The
+formal `PredictionResult` was `backend_name: igfold`, `status: succeeded`,
+with no warnings. It produced `igfold_prediction.pdb` (96,075 bytes; SHA-256
+`71c73e3dc958cf54171bd51590073eafc9c66b581e9007baa3c5d08869e7f1e5`),
+1,184 ATOM records, no HETATM or hydrogen atoms, and exactly H/L chains with
+125/117 residues. Recovered sequences exactly matched the paired inputs; no
+residues were missing and no non-standard residues were observed. The worker's
+only recorded native field was `prmsd` with shape `[1, 242, 4]`, retained as
+`metadata.native_metrics` with semantics `backend_native_unscaled`; it is not
+pLDDT, PAE, ipTM, pTM, or a cross-backend confidence score.
+
+An earlier separate Python 3.11 attempt remains part of the compatibility
+record: PyTorch 2.7.1 safe checkpoint loading then Transformers 5.14.1 legacy
+tokenizer removal blocked two initialization-only runs before any PDB was
+written. The successful legacy worker does not change that incompatibility
+boundary.
+
+This is a **local IgFold prediction-backend software-integration smoke test**.
+It verifies one isolated-worker invocation, H/L handling, output discovery,
+and chain-sequence preservation. It does not verify structure accuracy,
+predicted-error interpretation, docking, DB5.5, production readiness,
+affinity, binding energy, experimental validity, Docker GPU execution, cloud
+compute, or Live Remote.
+
 ## Not validated
 
 - IgCraft execution inside the application;
 - general antibody accuracy or real-dataset structure benchmarking;
-- IgFold inference through the new prediction-only backend;
+- general IgFold accuracy or real-dataset scientific benchmarking (one local
+  prediction-only integration smoke succeeded);
 - antigen docking from the prediction-only ColabFold result;
 - Docker GPU/ColabFold execution;
 - concurrent users or long-running recovery;

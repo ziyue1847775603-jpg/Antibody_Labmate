@@ -108,6 +108,10 @@ def test_clean_release_zip_and_source_checksums(
 ) -> None:
     repository_checksum = project_root / "SOURCE_CHECKSUMS.sha256"
     checksum_before = repository_checksum.read_bytes()
+    assert {
+        "labmate/workers/__init__.py",
+        "labmate/workers/igfold_worker.py",
+    }.issubset(REQUIRED_RELEASE_PATHS)
     isolated_root = tmp_path / project_root.name
     shutil.copytree(
         project_root,

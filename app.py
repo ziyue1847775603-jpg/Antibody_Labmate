@@ -31,7 +31,7 @@ PREDICTION_BACKEND_OPTIONS = {
     ),
     "igfold": (
         "IgFold",
-        "Antibody-specialized prediction",
+        "Local paired VH/VL prediction-only; unavailable on this Replay web host",
     ),
 }
 

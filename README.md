@@ -22,8 +22,12 @@ CLI 还提供 Phase 2b `benchmark_local`：本地抗体 PDB 与抗原 PDB 直接
   不捆绑源码、数据库或权重，也不联系公共 MSA 服务。默认使用一个
   model、一个 recycle、零 relaxation 和 `compile-mode=fast`，适合受控的
   prediction-only smoke，不代表生产质量参数。
-- **IgFold**：抗体专用的快速本机 wrapper，支持 VH 和可选 VL。
-  IgFold 包及所需模型必须由用户预先安装；项目不会下载模型。
+- **IgFold**：抗体专用的本机 prediction-only wrapper，要求成对的完整
+  VH/VL。wrapper 固定关闭 Rosetta refinement 和 renumbering，使用空的
+  独立输出目录并严格复核 H/L 链序列。IgFold 0.4.0 可通过明确指定的、
+  用户自管的外部 Python interpreter 运行；项目不会捆绑 IgFold、环境或
+  权重，且不会静默回退到 Replay。其 JHU Academic Software License
+  含非商业使用条款，用户必须自行确认适用性。
 
 预测阶段可以独立运行；当前外部预测插件不会被错误接到固定 Replay
 docking 产物上。既有完整真实计算路径仍是经过限定配置验证的
@@ -47,8 +51,9 @@ labmate predict \
 # IgFold：本机抗体结构预测阶段
 labmate predict \
   --prediction-backend igfold \
-  --heavy-chain "FULL_VH_SEQUENCE" \
-  --light-chain "FULL_VL_SEQUENCE" \
+  --igfold-python "$IGFOLD_PYTHON" \
+  --heavy-chain-file input/vh.txt \
+  --light-chain-file input/vl.txt \
   --output runs/igfold_prediction
 ```
 
@@ -64,6 +69,14 @@ FASTA，GPU 计算完成并生成唯一、非空、A/B 两链的 rank-1 PDB。�
 证明本机软件集成可以运行；不证明抗体结构准确性、docking、DB5.5
 benchmark、亲和力或实验结果。完整命令、PDB SHA-256、显存采样和限制见
 [`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md#colabfold-prediction-backend-smoke-test)。
+
+同日还完成一次真实 IgFold 0.4.0 **external-interpreter** prediction-only
+smoke：Python 3.11 的 Labmate CLI 调用隔离的 Python 3.10 worker，使用一对
+VH/VL 生成非空 H/L 两链 PDB，并通过严格的逐链序列校验。该 legacy 环境为
+CPU-only；它只证明这个本机软件集成、worker 协议和输出发现可以运行，
+不证明结构准确性、docking、DB5.5 benchmark、亲和力或实验结果。此前
+Python 3.11/Transformers 5 组合的失败也保留在验证记录中。详见
+[`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md#igfold-prediction-backend-smoke-test)。
 
 ## Benchmark Local（真实 synthetic 集成已运行、科学未验证）
 

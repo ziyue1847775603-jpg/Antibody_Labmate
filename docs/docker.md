@@ -35,8 +35,9 @@ The base image intentionally supports Replay only. ColabFold, IgFold, and
 LightDock remain user-installed external tools and are not downloaded during
 the image build.
 
-The recorded 2026-07-29 ColabFold prediction-backend smoke ran directly in the
-host WSL2 environment, not in this image. Docker GPU prediction remains
+The recorded 2026-07-29 ColabFold and isolated-interpreter IgFold
+prediction-backend smokes ran directly in the host WSL2 environment, not in
+this image. Docker GPU prediction remains
 unverified.
 
 A custom live-compute image or host installation must separately provide:

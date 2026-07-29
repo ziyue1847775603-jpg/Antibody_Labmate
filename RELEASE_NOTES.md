@@ -25,6 +25,21 @@
   path-redacted logs, surfaced recovered GPU allocation warnings, and changed
   concrete backend package exports to lazy loading to prevent fresh-process
   workflow import cycles.
+- Completed one real local IgFold 0.4.0 prediction-only smoke through an
+  explicit external-interpreter bridge: the Python 3.11 Labmate process
+  invoked an isolated Python 3.10 legacy worker, which produced a non-empty
+  H/L-chain PDB with exact input-sequence preservation. This is bounded local
+  software-integration evidence only; it is not scientific, docking,
+  benchmark, production, Docker-GPU, or remote-worker validation.
+- Added a Python-3.10-compatible IgFold worker and an explicit
+  `--igfold-python` option. The bridge uses a fixed worker script, JSON files
+  under a new controlled output directory, argument-list subprocess calls with
+  `shell=False`, minimal secret-free environment, a 30-minute timeout,
+  path/token-redacted bounded logs, and fail-closed response/PDB validation.
+  It fixes one model, disables refinement/renumbering, rejects symlinks,
+  stale/out-of-directory/invalid-chain PDBs, and preserves exact H/L sequences.
+  IgFold native `prmsd` remains backend-native and unscaled; no generic
+  confidence or docking/affinity metric is fabricated.
 
 ## v0.3.0 — Benchmark Local (2026-07-28)
 

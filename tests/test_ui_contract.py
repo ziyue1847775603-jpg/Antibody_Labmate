@@ -14,7 +14,10 @@ def test_streamlit_source_has_persistent_replay_truth_labels(project_root) -> No
     assert '"IgFold"' in source
     assert "Deterministic offline demonstration" in source
     assert "AlphaFold2 based local prediction" in source
-    assert "Antibody-specialized prediction" in source
+    assert (
+        "Local paired VH/VL prediction-only; unavailable on this Replay web host"
+        in source
+    )
     assert "The web workflow remains the hash-verified Replay demo." in source
     assert "prediction_backend_name != \"replay\"" in source
     assert "RemoteBackend" not in source

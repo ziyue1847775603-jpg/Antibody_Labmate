@@ -272,16 +272,60 @@ def test_colabfold_refuses_symlinked_pdb_output(
     ]
 
 
+_ONE_TO_THREE = {
+    "A": "ALA",
+    "C": "CYS",
+    "D": "ASP",
+    "E": "GLU",
+    "F": "PHE",
+    "G": "GLY",
+    "H": "HIS",
+    "I": "ILE",
+}
+
+
+def _write_test_antibody_pdb(
+    path: Path,
+    sequences: dict[str, str],
+) -> None:
+    lines: list[str] = []
+    serial = 1
+    for chain_id, sequence in sequences.items():
+        for residue_number, residue in enumerate(sequence, start=1):
+            lines.append(
+                f"ATOM  {serial:5d}  CA  {_ONE_TO_THREE[residue]:>3s} "
+                f"{chain_id}{residue_number:4d}    "
+                f"{float(serial):8.3f}{0.0:8.3f}{0.0:8.3f}"
+                f"{1.0:6.2f}{20.0:6.2f}           C  "
+            )
+            serial += 1
+    path.write_text("\n".join([*lines, "TER", "END", ""]), encoding="utf-8")
+
+
 class _FakeIgFoldRunner:
-    def fold(self, output_path: str, *, sequences: dict[str, str]) -> None:
-        assert sequences == {"H": "ACDE", "L": "FGHI"}
-        Path(output_path).write_text("MODEL        1\nENDMDL\n", encoding="utf-8")
+    observed_options: dict[str, object] = {}
+
+    def fold(
+        self,
+        output_path: str,
+        *,
+        sequences: dict[str, str],
+        do_refine: bool,
+        do_renum: bool,
+    ) -> None:
+        self.observed_options = {
+            "sequences": sequences,
+            "do_refine": do_refine,
+            "do_renum": do_renum,
+        }
+        _write_test_antibody_pdb(Path(output_path), sequences)
 
 
 def test_prediction_result_format_with_injected_igfold_runner(
     tmp_path: Path,
 ) -> None:
-    backend = IgFoldBackend(runner_factory=_FakeIgFoldRunner)
+    runner = _FakeIgFoldRunner()
+    backend = IgFoldBackend(runner_factory=lambda: runner)
     result = backend.predict("acde", "fghi", output_dir=tmp_path)
 
     assert isinstance(result, PredictionResult)
@@ -295,6 +339,17 @@ def test_prediction_result_format_with_injected_igfold_runner(
     assert result.status == "succeeded"
     assert result.backend_name == "igfold"
     assert result.metadata["chains"] == ["H", "L"]
+    assert result.metadata["residue_counts"] == {"H": 4, "L": 4}
+    assert result.metadata["sequence_preserved"] is True
+    assert result.metadata["refinement"] is False
+    assert result.metadata["renumbering"] is False
+    assert result.metadata["stdout_log"] == "igfold.stdout.log"
+    assert result.metadata["stderr_log"] == "igfold.stderr.log"
+    assert runner.observed_options == {
+        "sequences": {"H": "ACDE", "L": "FGHI"},
+        "do_refine": False,
+        "do_renum": False,
+    }
 
 
 def test_igfold_missing_environment_is_structured_unavailable(
@@ -308,3 +363,152 @@ def test_igfold_missing_environment_is_structured_unavailable(
 
     assert result.status == "unavailable"
     assert result.warnings == ["IgFold backend unavailable"]
+
+
+def test_igfold_requires_paired_valid_sequences(tmp_path: Path) -> None:
+    backend = IgFoldBackend(runner_factory=_FakeIgFoldRunner)
+
+    result = backend.predict("ACDE", None, output_dir=tmp_path / "single")
+    assert result.status == "failed"
+    assert result.warnings == [
+        "IgFold prediction-only backend requires a paired VH/VL input"
+    ]
+
+    with pytest.raises(ValueError, match="heavy_chain must not be empty"):
+        backend.predict("", "FGHI", output_dir=tmp_path / "empty")
+    with pytest.raises(ValueError, match="unsupported amino-acid symbols"):
+        backend.predict("ACDX", "FGHI", output_dir=tmp_path / "invalid")
+
+
+def test_igfold_refuses_nonempty_output_directory(tmp_path: Path) -> None:
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    (output_dir / "old.pdb").write_text("old output", encoding="utf-8")
+
+    result = IgFoldBackend(runner_factory=_FakeIgFoldRunner).predict(
+        "ACDE",
+        "FGHI",
+        output_dir=output_dir,
+    )
+
+    assert result.status == "failed"
+    assert result.pdb_path is None
+    assert result.warnings == [
+        "IgFold output directory must be empty to prevent stale-output selection"
+    ]
+
+
+def test_igfold_failure_cannot_promote_leftover_pdb(
+    tmp_path: Path,
+) -> None:
+    class FailingRunner:
+        def fold(
+            self,
+            output_path: str,
+            *,
+            sequences: dict[str, str],
+            do_refine: bool,
+            do_renum: bool,
+        ) -> None:
+            _write_test_antibody_pdb(Path(output_path), sequences)
+            raise RuntimeError(
+                f"\x1b[31mfailed at {tmp_path} with sk-{'a' * 24} "
+                f"{'x' * (5 * 1024)}"
+            )
+
+    result = IgFoldBackend(runner_factory=FailingRunner).predict(
+        "ACDE",
+        "FGHI",
+        output_dir=tmp_path / "output",
+    )
+
+    assert result.status == "failed"
+    assert result.pdb_path is None
+    assert str(tmp_path) not in result.warnings[0]
+    assert "sk-" not in result.warnings[0]
+    assert "<token-redacted>" in result.warnings[0]
+    assert "\x1b" not in result.warnings[0]
+    assert len(result.warnings[0].encode()) < 4200
+    assert result.warnings[0].endswith("<warning truncated>")
+
+
+def test_igfold_rejects_symlinked_pdb_and_sequence_mismatch(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path / "outside.pdb"
+    _write_test_antibody_pdb(outside, {"H": "ACDE", "L": "FGHI"})
+
+    class SymlinkRunner:
+        def fold(
+            self,
+            output_path: str,
+            *,
+            sequences: dict[str, str],
+            do_refine: bool,
+            do_renum: bool,
+        ) -> None:
+            Path(output_path).symlink_to(outside)
+
+    symlink_result = IgFoldBackend(runner_factory=SymlinkRunner).predict(
+        "ACDE",
+        "FGHI",
+        output_dir=tmp_path / "symlink-output",
+    )
+    assert symlink_result.status == "failed"
+    assert symlink_result.pdb_path is None
+    assert "symbolic link" in symlink_result.warnings[0]
+
+    class MismatchRunner:
+        def fold(
+            self,
+            output_path: str,
+            *,
+            sequences: dict[str, str],
+            do_refine: bool,
+            do_renum: bool,
+        ) -> None:
+            _write_test_antibody_pdb(
+                Path(output_path),
+                {"H": "ACDE", "L": "FGHH"},
+            )
+
+    mismatch_result = IgFoldBackend(runner_factory=MismatchRunner).predict(
+        "ACDE",
+        "FGHI",
+        output_dir=tmp_path / "mismatch-output",
+    )
+    assert mismatch_result.status == "failed"
+    assert mismatch_result.pdb_path is None
+    assert "sequence does not exactly match input" in mismatch_result.warnings[0]
+
+
+def test_igfold_logs_are_sanitized_and_metadata_is_bounded(
+    tmp_path: Path,
+) -> None:
+    class NoisyRunner:
+        def fold(
+            self,
+            output_path: str,
+            *,
+            sequences: dict[str, str],
+            do_refine: bool,
+            do_renum: bool,
+        ) -> None:
+            print(f"{tmp_path} {'x' * (70 * 1024)}")
+            print("AWS_SECRET_ACCESS_KEY shell environment variable", file=sys.stderr)
+            _write_test_antibody_pdb(Path(output_path), sequences)
+
+    result = IgFoldBackend(runner_factory=NoisyRunner).predict(
+        "ACDE",
+        "FGHI",
+        output_dir=tmp_path / "output",
+    )
+
+    assert result.status == "succeeded"
+    assert "<log excerpt:" in result.metadata["stdout"]
+    assert len(result.metadata["stdout"].encode()) < 66 * 1024
+    assert str(tmp_path) not in result.metadata["stdout"]
+    assert "AWS_SECRET_ACCESS_KEY" not in result.metadata["stderr"]
+    assert "<environment-variable>" in result.metadata["stderr"]
+    stdout_log = tmp_path / "output" / result.metadata["stdout_log"]
+    assert str(tmp_path) not in stdout_log.read_text(encoding="utf-8")

@@ -37,6 +37,20 @@ def fixture_path(fixture_id: str) -> Path:
     return path
 
 
+def chain_sequence_file(path: Path, *, label: str) -> str:
+    """Read one local raw chain sequence without placing it in process argv."""
+
+    if path.is_symlink() or not path.is_file():
+        raise LabmateError(f"{label} sequence file must be a regular file: {path}")
+    try:
+        sequence = "".join(path.read_text(encoding="utf-8").split())
+    except OSError as exc:
+        raise LabmateError(f"unable to read {label} sequence file") from exc
+    if not sequence:
+        raise LabmateError(f"{label} sequence file is empty")
+    return sequence
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="labmate", description="Antibody Labmate")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -67,8 +81,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=PREDICTION_BACKEND_NAMES,
         default="replay",
     )
-    predict.add_argument("--heavy-chain", required=True)
-    predict.add_argument("--light-chain")
+    heavy_input = predict.add_mutually_exclusive_group(required=True)
+    heavy_input.add_argument("--heavy-chain")
+    heavy_input.add_argument("--heavy-chain-file", type=Path)
+    light_input = predict.add_mutually_exclusive_group()
+    light_input.add_argument("--light-chain")
+    light_input.add_argument("--light-chain-file", type=Path)
     predict.add_argument("--antigen-pdb", type=Path)
     predict.add_argument(
         "--output",
@@ -81,6 +99,14 @@ def build_parser() -> argparse.ArgumentParser:
         default="colabfold_batch",
     )
     predict.add_argument("--colabfold-model-data", type=Path)
+    predict.add_argument(
+        "--igfold-python",
+        type=Path,
+        help=(
+            "explicit local Python interpreter containing IgFold; only valid "
+            "with --prediction-backend igfold"
+        ),
+    )
 
     subcommands.add_parser("capabilities", help="print truthful capability states")
     return parser
@@ -94,11 +120,31 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "predict":
             backend_options: dict[str, object] = {}
+            if (
+                args.igfold_python is not None
+                and args.prediction_backend != "igfold"
+            ):
+                raise LabmateError(
+                    "--igfold-python is only valid with --prediction-backend igfold"
+                )
             if args.prediction_backend == "replay":
                 backend_options["fixture_root"] = fixture_path(args.fixture)
             elif args.prediction_backend == "colabfold":
+                if args.igfold_python is not None:
+                    raise LabmateError(
+                        "--igfold-python is only valid with --prediction-backend igfold"
+                    )
                 backend_options["executable"] = args.colabfold_executable
                 backend_options["model_data_dir"] = args.colabfold_model_data
+            elif args.prediction_backend == "igfold":
+                if args.colabfold_model_data is not None or (
+                    args.colabfold_executable != "colabfold_batch"
+                ):
+                    raise LabmateError(
+                        "ColabFold options are not valid with --prediction-backend igfold"
+                    )
+                if args.igfold_python is not None:
+                    backend_options["igfold_python"] = args.igfold_python
             backend = get_backend(args.prediction_backend, **backend_options)
             antigen_path = (
                 args.antigen_pdb.resolve()
@@ -109,9 +155,23 @@ def main(argv: list[str] | None = None) -> int:
                 raise LabmateError(
                     f"antigen PDB does not exist: {args.antigen_pdb}"
                 )
+            heavy_chain = (
+                args.heavy_chain
+                if args.heavy_chain is not None
+                else chain_sequence_file(args.heavy_chain_file, label="heavy_chain")
+            )
+            light_chain = (
+                args.light_chain
+                if args.light_chain is not None
+                else (
+                    chain_sequence_file(args.light_chain_file, label="light_chain")
+                    if args.light_chain_file is not None
+                    else None
+                )
+            )
             prediction = backend.predict(
-                heavy_chain=args.heavy_chain,
-                light_chain=args.light_chain,
+                heavy_chain=heavy_chain,
+                light_chain=light_chain,
                 antigen_pdb=antigen_path,
                 output_dir=(
                     None
