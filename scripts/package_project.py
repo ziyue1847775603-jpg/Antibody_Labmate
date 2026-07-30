@@ -72,6 +72,8 @@ REQUIRED_RELEASE_PATHS = {
     "labmate/prediction_artifact.py",
     "labmate/docking/lightdock.py",
     "docs/docking_execution.md",
+    "docs/input_contracts.md",
+    "docs/igcraft_evaluation.md",
     "labmate/workers/__init__.py",
     "labmate/workers/igfold_worker.py",
 }

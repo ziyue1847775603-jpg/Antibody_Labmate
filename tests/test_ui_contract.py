@@ -19,5 +19,6 @@ def test_streamlit_source_has_persistent_replay_truth_labels(project_root) -> No
         in source
     )
     assert "The web workflow remains the hash-verified Replay demo." in source
+    assert "六条 CDR 不能在此网页生成 framework 或完整 VH/VL" in source
     assert "prediction_backend_name != \"replay\"" in source
     assert "RemoteBackend" not in source

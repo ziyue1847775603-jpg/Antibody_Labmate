@@ -10,6 +10,20 @@ def default_provider() -> LightDockProvider:
 def capability_matrix() -> dict[str, object]:
     provider = default_provider()
     return {
+        "input_contracts": {
+            "replay_cdr_demo": True,
+            "live_cdr_to_sequence": False,
+            "live_complete_vh_vl_input": True,
+            "colabfold_prediction": True,
+            "igfold_prediction": True,
+            "prediction_artifact": True,
+            "independent_lightdock_execution": True,
+            "igcraft_audited": True,
+            "igcraft_integrated": False,
+            "igcraft_block_reason": "input_contract_mismatch",
+            "remote_worker": False,
+            "unified_cross_backend_ranking": False,
+        },
         "replay": {
             "status": "replay_only",
             "enabled": True,

@@ -1,5 +1,10 @@
 # Antibody Labmate — CDR-to-Docking Workflow
 
+> **Input boundary:** six CDR strings are accepted only by the fixed,
+> hash-verified Replay demonstration. They do not generate a framework or
+> complete VH/VL locally. Real local computation requires complete paired VH/VL
+> sequences or a locally validated PredictionArtifact.
+
 > **v0.3.0 · REPLAY + VERIFIED LIVE LOCAL + IMPLEMENTED-UNVERIFIED BENCHMARK LOCAL · NO LIVE REMOTE**
 
 本版本保留 Phase 1 Replay MVP，并新增 Phase 2a Live Local CLI。Replay 接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行固定产物重放。运行时会重新完成 PDB 解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。
@@ -97,6 +102,10 @@ labmate run project.json --mode benchmark_local
 ## Live Local（已验证限定配置、CLI-only）
 
 Live Local 接受完整 VH/VL 候选 FASTA、精确的 region CSV 和一个单链抗原 PDB。它依次调用本机 ColabFold、LightDock，再执行几何界面分析、候选排名和 HTML 报告。所有外部命令输出写入 run 日志；成功完成全部校验后，报告与 manifest 标记为 `LIVE LOCAL · VERIFIED LIVE`。
+
+region CSV 仅标注完整序列的区域，供校验、分析和既有 ranking 使用；它不补全 framework，六条 CDR 不能替代完整 VH/VL。模块化本地路径同样要求完整 VH/VL 或已验证 `PredictionArtifact`，随后可产生 `DockingInput` 和独立 LightDock pose/manifest；不提供 CDR-only sequence generation 或跨后端统一 ranking。能力矩阵与完整输入契约见 [`docs/input_contracts.md`](docs/input_contracts.md)。
+
+IgCraft 已审计但未集成：可用本地版本的 grafting 接口要求完整抗体 PDB，而非六条 CDR 字符串。项目不会使用参考 VH/VL、固定 framework 或其他模型冒充 CDR-to-sequence generation。详见 [`docs/igcraft_evaluation.md`](docs/igcraft_evaluation.md)。
 
 开始前请单独安装并确认本机可运行 `colabfold_batch`、`lightdock3_setup.py`、`lightdock3.py`、`lgd_generate_conformations.py`。工具不会由本项目安装。配置会 fail closed：必须显式指定 MSA 模式、预装模型目录和 `alphafold2_multimer_v3`；模板使用不联系公共 MSA 服务的 `single_sequence`。复制 [`examples/live_local`](examples/live_local) 到仓库外并填写有权处理的输入后：
 

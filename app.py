@@ -69,7 +69,7 @@ if "cdr_h_cdr1" not in st.session_state:
     reset_demo(demo_job)
 
 st.title("Antibody Labmate — CDR-to-Docking Workflow")
-st.caption("网页仍是 Phase 1 Replay 演示：只重放精确匹配的合成 fixture；不会在网页中运行或模拟 IgCraft、ColabFold、LightDock 或远程 worker。")
+st.caption("网页仍是 Phase 1 Replay 演示：只重放精确匹配的合成 fixture；不会在网页中运行或模拟 IgCraft、ColabFold、LightDock 或远程 worker。六条 CDR 不能在此网页生成 framework 或完整 VH/VL；真实本地计算需要完整 VH/VL。")
 
 capabilities = capability_matrix()
 cap_cols = st.columns(4)
@@ -112,7 +112,7 @@ with new_run_tab:
             l_cdr1 = st.text_input("L-CDR1", key="cdr_l_cdr1")
             l_cdr2 = st.text_input("L-CDR2", key="cdr_l_cdr2")
             l_cdr3 = st.text_input("L-CDR3", key="cdr_l_cdr3")
-        st.info("可编辑字段用于演示校验失败行为。任何规范化后哈希不同的 CDR 都会被 ReplayBackend 拒绝，不会套用 demo 结果。")
+        st.info("六条 CDR 仅用于固定 Replay 演示，不会生成 framework 或完整 VH/VL。可编辑字段用于演示校验失败行为；任何规范化后哈希不同的 CDR 都会被 ReplayBackend 拒绝，不会套用 demo 结果。")
 
     with right:
         st.subheader("抗原 PDB")

@@ -365,6 +365,15 @@ compute, or Live Remote.
 
 ## Not validated
 
+## Input contract boundary
+
+The verified Live Local path accepts complete paired VH/VL sequences, a region
+annotation CSV, and antigen PDB input. The CSV annotates existing sequences; it
+does not generate frameworks. Six CDR strings are only supported by the fixed
+Replay fixture and cannot initiate a local prediction/docking run. IgCraft was
+audited but not integrated because the available grafting interface requires a
+complete antibody PDB rather than six CDR strings.
+
 ## Independent LightDock Execution Adapter Smoke Test
 
 An isolated local execution smoke used a validated IgFold VH/VL artifact as

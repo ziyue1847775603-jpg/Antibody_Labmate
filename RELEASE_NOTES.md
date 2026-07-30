@@ -43,7 +43,7 @@
 
 ## v0.3.0 — Benchmark Local (2026-07-28)
 
-### Local docking execution adapter (uncommitted validation branch)
+### Local docking execution adapter
 
 - Added an explicit, local-only LightDock execution handoff for validated
   `DockingInput` JSON. It runs the user-supplied 0.9.x setup, sampling and
@@ -53,6 +53,16 @@
 - One minimal public-fixture LightDock 0.9.4 engineering smoke completed with
   an IgFold prediction artifact as ligand. This verifies software integration,
   not pose correctness, affinity, epitope, DB5.5 performance, or experiments.
+
+### Input-contract hardening (uncommitted branch)
+
+- Clarified that six CDR strings are only a fixed Replay demonstration input;
+  they do not generate complete VH/VL during local computation.
+- Live Local requires complete VH/VL FASTA plus region annotations and antigen;
+  the modular path requires complete VH/VL or a validated PredictionArtifact.
+- IgCraft was audited but not integrated because its available grafting API
+  requires a complete antibody PDB rather than six CDR strings. No reference
+  framework or substitute generator is used to bridge that mismatch.
 
 - Replay remains the stable hash-exact synthetic demonstration mode.
 - Live Local remains the previously validated one-candidate synthetic WSL2

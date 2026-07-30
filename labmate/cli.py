@@ -99,10 +99,10 @@ def build_parser() -> argparse.ArgumentParser:
     dock.add_argument("--seed", type=int, default=0)
     dock.add_argument("--timeout-seconds", type=int, default=1800)
     heavy_input = predict.add_mutually_exclusive_group(required=True)
-    heavy_input.add_argument("--heavy-chain")
+    heavy_input.add_argument("--heavy-chain", help="complete heavy variable-domain sequence required")
     heavy_input.add_argument("--heavy-chain-file", type=Path)
     light_input = predict.add_mutually_exclusive_group()
-    light_input.add_argument("--light-chain")
+    light_input.add_argument("--light-chain", help="complete light variable-domain sequence required")
     light_input.add_argument("--light-chain-file", type=Path)
     predict.add_argument("--antigen-pdb", type=Path)
     predict.add_argument(
