@@ -17,6 +17,8 @@ from labmate.backends.local import LiveLocalBackend
 from labmate.backends.benchmark import BenchmarkLocalBackend
 from labmate.benchmark_local import load_benchmark_local_project
 from labmate.docking.registry import capability_matrix
+from labmate.docking.lightdock import LocalLightDockExecutor
+from labmate.prediction_artifact import DockingInput
 from labmate.errors import LabmateError
 from labmate.workflow import load_project
 from labmate.live_local import load_live_local_project
@@ -81,6 +83,21 @@ def build_parser() -> argparse.ArgumentParser:
         choices=PREDICTION_BACKEND_NAMES,
         default="replay",
     )
+
+    dock = subcommands.add_parser(
+        "dock", help="run a local docking executable from a validated docking input",
+    )
+    dock.add_argument("--docking-input", required=True, type=Path)
+    dock.add_argument("--output", required=True, type=Path)
+    dock.add_argument("--docking-backend", choices=["lightdock"], default="lightdock")
+    dock.add_argument("--lightdock-setup-executable", required=True, type=Path)
+    dock.add_argument("--lightdock-sampling-executable", required=True, type=Path)
+    dock.add_argument("--lightdock-conformation-executable", required=True, type=Path)
+    dock.add_argument("--swarms", type=int, default=1)
+    dock.add_argument("--glowworms", type=int, default=5)
+    dock.add_argument("--gso-steps", type=int, default=5)
+    dock.add_argument("--seed", type=int, default=0)
+    dock.add_argument("--timeout-seconds", type=int, default=1800)
     heavy_input = predict.add_mutually_exclusive_group(required=True)
     heavy_input.add_argument("--heavy-chain")
     heavy_input.add_argument("--heavy-chain-file", type=Path)
@@ -187,6 +204,33 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0 if prediction.status == "succeeded" else 3
+        if args.command == "dock":
+            input_path = args.docking_input.resolve()
+            if input_path.is_symlink() or not input_path.is_file():
+                raise LabmateError("--docking-input must be a regular JSON file")
+            try:
+                handoff = DockingInput.model_validate_json(input_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, ValidationError) as exc:
+                raise LabmateError("invalid docking input JSON") from exc
+            if handoff.schema_version != 1 or handoff.docking_backend != args.docking_backend:
+                raise LabmateError("docking input schema/backend is not supported")
+            executor = LocalLightDockExecutor(
+                setup_executable=args.lightdock_setup_executable,
+                sampling_executable=args.lightdock_sampling_executable,
+                conformation_executable=args.lightdock_conformation_executable,
+            )
+            result = executor.execute(
+                handoff,
+                allowed_root=project_root(),
+                output_dir=args.output,
+                swarms=args.swarms,
+                glowworms=args.glowworms,
+                steps=args.gso_steps,
+                seed=args.seed,
+                timeout_seconds=args.timeout_seconds,
+            )
+            print(json.dumps({"status": result.status, "docking_backend": result.docking_backend, "selected_pose": result.selected_pose, "native_scores": result.native_scores}, ensure_ascii=False, indent=2))
+            return 0
         if args.mode == "replay":
             prediction_backend_name = args.prediction_backend or "replay"
             if prediction_backend_name != "replay":

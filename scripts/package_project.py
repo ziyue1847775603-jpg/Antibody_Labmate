@@ -70,6 +70,8 @@ REQUIRED_RELEASE_PATHS = {
     "labmate/backends/colabfold.py",
     "labmate/backends/igfold.py",
     "labmate/prediction_artifact.py",
+    "labmate/docking/lightdock.py",
+    "docs/docking_execution.md",
     "labmate/workers/__init__.py",
     "labmate/workers/igfold_worker.py",
 }

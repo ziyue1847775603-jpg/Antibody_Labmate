@@ -365,6 +365,17 @@ compute, or Live Remote.
 
 ## Not validated
 
+## Independent LightDock Execution Adapter Smoke Test
+
+An isolated local execution smoke used a validated IgFold VH/VL artifact as
+the ligand and `fixtures/demo_001/input/antigen.pdb` as the receptor. The
+separately installed LightDock 0.9.4 command sequence was setup, sampling,
+explicit GSO-row selection, then conformation generation. Parameters were one
+swarm, five glowworms, five GSO steps and seed 0. It produced one non-empty
+ATOM PDB pose and a run-relative manifest. This is an engineering integration
+smoke only: the native `fastdfire` score is not affinity, and no scientific
+docking, binding, epitope, experimental, or therapeutic claim follows.
+
 - IgCraft execution inside the application;
 - general antibody accuracy or real-dataset structure benchmarking;
 - general IgFold accuracy or real-dataset scientific benchmarking (one local

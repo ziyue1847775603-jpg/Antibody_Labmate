@@ -327,6 +327,18 @@ python -m scripts.package_project
 
 ## 当前未验证部分
 
+### Independent local docking execution
+
+The `labmate dock` command accepts a hash-validated `DockingInput` and explicit
+user-installed LightDock executable paths. It is separate from Replay ranking
+and never combines ColabFold or IgFold native metrics with docking scores. One
+minimal local LightDock 0.9.4 fixture smoke has completed using an IgFold H/L
+artifact as ligand and the public synthetic antigen fixture as receptor. This
+only verifies command construction, GSO-to-pose selection and pose discovery;
+a LightDock native score is not affinity and the smoke is not scientific,
+epitope, binding or experimental validation. See
+[docking execution details](docs/docking_execution.md).
+
 - 应用内 IgCraft 执行与模型验证；
 - ColabFold 公共或本地 MSA-backed 模式、模板模式、其他版本/模型、批量规模与性能；
 - LightDock 其他版本、评分函数、大规模参数、性能与任何 GPL 组合分发；

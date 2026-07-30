@@ -43,6 +43,17 @@
 
 ## v0.3.0 — Benchmark Local (2026-07-28)
 
+### Local docking execution adapter (uncommitted validation branch)
+
+- Added an explicit, local-only LightDock execution handoff for validated
+  `DockingInput` JSON. It runs the user-supplied 0.9.x setup, sampling and
+  conformation executables with bounded subprocesses and run-relative
+  provenance. It remains separate from Replay ranking and prediction-native
+  metrics.
+- One minimal public-fixture LightDock 0.9.4 engineering smoke completed with
+  an IgFold prediction artifact as ligand. This verifies software integration,
+  not pose correctness, affinity, epitope, DB5.5 performance, or experiments.
+
 - Replay remains the stable hash-exact synthetic demonstration mode.
 - Live Local remains the previously validated one-candidate synthetic WSL2
   software-integration configuration. Its bounded `verified_live` label does
