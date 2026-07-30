@@ -5,12 +5,13 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -18,6 +19,14 @@ from labmate.docking.base import DockingProvider
 from labmate.errors import FixtureIntegrityError, LiveCapabilityUnavailable
 from labmate.models import Capability, CapabilityStatus
 from labmate.prediction_artifact import DockingInput
+
+GLOBAL_RANK_METHOD = "lightdock_native_score_cross_swarm_sort_v1"
+NATIVE_SCORE_NAME = "fastdfire"
+NATIVE_SCORE_DIRECTION = "higher_is_better"
+NATIVE_SCORE_SEMANTICS = (
+    "LightDock tool-native docking score (fastdfire); higher_is_better; "
+    "not affinity"
+)
 
 REQUIRED_COLUMNS = {
     "candidate_id",
@@ -69,6 +78,35 @@ class DockingExecutionResult:
     exit_codes: dict[str, int | None]
     tool_versions: dict[str, str]
     warnings: list[str]
+    requested_pose_count: int = 1
+    generated_pose_count: int = 0
+    validated_pose_count: int = 0
+    pose_records: list["DockingPoseRecord"] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class DockingPoseRecord:
+    pose_index: int
+    global_tool_score_rank: int
+    tool_native_rank: int
+    swarm_id: int
+    swarm_local_rank: int
+    gso_row_id: int
+    gso_row: int
+    pose_path: str | None
+    pose_sha256: str | None
+    native_score: float
+    raw_native_score: float
+    native_score_name: str
+    native_score_semantics: str
+    global_rank_method: str
+    tie_break_fields: list[str]
+    generation_status: str
+    validation_status: str
+    failure_reason: str | None = None
+    duplicate_pose_group: str | None = None
+    provenance: dict[str, object] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 def _sha256(path: Path) -> str:
@@ -87,6 +125,144 @@ def _executable(path: Path, label: str) -> Path:
     if not path.exists() or not path.is_file() or not os.access(path, os.X_OK):
         raise ValueError(f"{label} must be an executable regular file")
     return path.resolve()
+
+
+@dataclass(frozen=True)
+class _RankedGsoRow:
+    global_tool_score_rank: int
+    swarm_id: int
+    swarm_local_rank: int
+    gso_row_id: int
+    score: float
+    raw_line: str
+    source_path: Path
+    source_sha256: str
+
+
+def _collect_ranked_gso_rows(
+    work: Path,
+    *,
+    expected_swarms: int,
+    steps: int,
+    score_direction: str,
+) -> list[_RankedGsoRow]:
+    """Collect every current-run swarm and derive a deterministic score order.
+
+    LightDock exposes scores inside each swarm but does not expose one native
+    cross-swarm rank.  The returned global rank is therefore a Labmate-derived
+    order over a single LightDock scoring function, never a CAPRI/reference
+    rank.
+    """
+    from labmate.live_local import _parse_lightdock_output
+
+    swarm_paths: dict[int, Path] = {}
+    for child in work.iterdir():
+        if not child.name.startswith("swarm_"):
+            continue
+        match = re.fullmatch(r"swarm_([0-9]+)", child.name)
+        if match is None:
+            raise RuntimeError(f"malformed LightDock swarm directory: {child.name}")
+        swarm_id = int(match.group(1))
+        if child.is_symlink() or not child.is_dir():
+            raise RuntimeError(f"LightDock swarm_{swarm_id} is not a regular directory")
+        resolved = child.resolve()
+        try:
+            resolved.relative_to(work.resolve())
+        except ValueError as exc:
+            raise RuntimeError(f"LightDock swarm_{swarm_id} escaped the run directory") from exc
+        if swarm_id in swarm_paths:
+            raise RuntimeError(f"duplicate LightDock swarm id: {swarm_id}")
+        swarm_paths[swarm_id] = resolved
+
+    expected_ids = set(range(expected_swarms))
+    observed_ids = set(swarm_paths)
+    if observed_ids != expected_ids:
+        missing = sorted(expected_ids - observed_ids)
+        extra = sorted(observed_ids - expected_ids)
+        raise RuntimeError(
+            f"LightDock swarm set mismatch; missing={missing}, unexpected={extra}"
+        )
+
+    candidates: list[tuple[int, int, int, float, str, Path, str]] = []
+    for swarm_id in sorted(swarm_paths):
+        gso = swarm_paths[swarm_id] / f"gso_{steps}.out"
+        if gso.is_symlink() or not gso.is_file():
+            raise RuntimeError(f"LightDock GSO output is missing for swarm_{swarm_id}")
+        resolved = gso.resolve()
+        try:
+            resolved.relative_to(work.resolve())
+        except ValueError as exc:
+            raise RuntimeError(f"LightDock GSO escaped the run directory: swarm_{swarm_id}") from exc
+        source_hash = _sha256(resolved)
+        solutions = _parse_lightdock_output(resolved)
+        local_order = sorted(
+            solutions,
+            key=(
+                (lambda row: (-row.score, row.glowworm_id))
+                if score_direction == "higher_is_better"
+                else (lambda row: (row.score, row.glowworm_id))
+            ),
+        )
+        local_ranks = {
+            row.glowworm_id: rank for rank, row in enumerate(local_order, start=1)
+        }
+        for row in solutions:
+            if not math.isfinite(row.score):
+                raise RuntimeError(
+                    f"LightDock native score is not finite in swarm_{swarm_id}"
+                )
+            candidates.append(
+                (
+                    swarm_id,
+                    local_ranks[row.glowworm_id],
+                    row.glowworm_id,
+                    row.score,
+                    row.raw_line,
+                    resolved,
+                    source_hash,
+                )
+            )
+
+    if score_direction == "higher_is_better":
+        candidates.sort(key=lambda row: (-row[3], row[0], row[2]))
+    elif score_direction == "lower_is_better":
+        candidates.sort(key=lambda row: (row[3], row[0], row[2]))
+    else:
+        raise RuntimeError("LightDock native score semantics are unsupported")
+
+    return [
+        _RankedGsoRow(
+            global_tool_score_rank=rank,
+            swarm_id=row[0],
+            swarm_local_rank=row[1],
+            gso_row_id=row[2],
+            score=row[3],
+            raw_line=row[4],
+            source_path=row[5],
+            source_sha256=row[6],
+        )
+        for rank, row in enumerate(candidates, start=1)
+    ]
+
+
+def _mark_duplicate_pose_groups(
+    records: list[DockingPoseRecord],
+) -> list[DockingPoseRecord]:
+    hashes: dict[str, list[int]] = {}
+    for index, record in enumerate(records):
+        if record.pose_sha256:
+            hashes.setdefault(record.pose_sha256, []).append(index)
+    duplicate_groups = {
+        digest: f"duplicate_pose_sha256_{group_index:03d}"
+        for group_index, (digest, indices) in enumerate(
+            ((digest, indices) for digest, indices in sorted(hashes.items()) if len(indices) > 1),
+            start=1,
+        )
+    }
+    return [
+        replace(record, duplicate_pose_group=duplicate_groups.get(record.pose_sha256 or ""))
+        for record in records
+    ]
 
 
 class LocalLightDockExecutor:
@@ -129,9 +305,9 @@ class LocalLightDockExecutor:
         match = re.search(r"\b([0-9]+\.[0-9]+(?:\.[0-9]+)?)\b", completed.stdout or "")
         return match.group(1) if completed.returncode == 0 and match else "not-probed"
 
-    def execute(self, docking_input: DockingInput, *, allowed_root: Path, output_dir: Path, swarms: int = 1, glowworms: int = 5, steps: int = 5, seed: int = 0, timeout_seconds: int = 1800) -> DockingExecutionResult:
-        if not 1 <= timeout_seconds <= 1800 or min(swarms, glowworms, steps) < 1:
-            raise ValueError("timeout must be 1..1800 and sampling counts must be positive")
+    def execute(self, docking_input: DockingInput, *, allowed_root: Path, output_dir: Path, swarms: int = 1, glowworms: int = 5, steps: int = 5, seed: int = 0, timeout_seconds: int = 1800, poses_per_case: int = 1) -> DockingExecutionResult:
+        if not 1 <= timeout_seconds <= 1800 or min(swarms, glowworms, steps, poses_per_case) < 1 or poses_per_case > 100:
+            raise ValueError("timeout must be 1..1800 and sampling counts/poses_per_case must be 1..100")
         root = allowed_root.resolve()
         antibody_source = root / docking_input.antibody_artifact.pdb_path
         antigen_source = root / docking_input.antigen_pdb_path
@@ -163,32 +339,151 @@ class LocalLightDockExecutor:
         exits: dict[str, int | None] = {"setup": None, "sampling": None, "conformations": None}
         exits["setup"] = self._run([str(self.setup_executable), receptor.name, ligand.name, "-s", str(swarms), "-g", str(glowworms), "--seed_points", str(seed), "--noxt", "--noh", "--now"], cwd=work, timeout_seconds=timeout_seconds, logs=logs, name="setup")
         exits["sampling"] = self._run([str(self.sampling_executable), "setup.json", str(steps), "-c", "1", "-sg", str(seed)], cwd=work, timeout_seconds=timeout_seconds, logs=logs, name="sampling")
-        gso = work / "swarm_0" / f"gso_{steps}.out"
-        if gso.is_symlink() or not gso.is_file(): raise RuntimeError("LightDock GSO output is missing")
-        rows = [line for line in gso.read_text(encoding="utf-8").splitlines() if line and not line.startswith("#")]
-        parsed = [(index, float(row.split()[-1]), row) for index, row in enumerate(rows) if len(row.split()) >= 8]
-        if not parsed: raise RuntimeError("LightDock GSO contained no score rows")
-        row_index, score, row = max(parsed, key=lambda item: item[1])
-        selected = work / "selected_top_poses.gso"; selected.write_text(row + "\n", encoding="utf-8")
-        exits["conformations"] = self._run([str(self.conformation_executable), receptor.name, ligand.name, selected.name, "1"], cwd=work, timeout_seconds=timeout_seconds, logs=logs, name="conformations")
-        generated = work / "lightdock_0.pdb"
-        if generated.is_symlink() or not generated.is_file() or generated.stat().st_size == 0 or b"ATOM" not in generated.read_bytes(): raise RuntimeError("LightDock pose is absent or invalid")
-        pose = poses / "pose_001.pdb"; shutil.copy2(generated, pose)
+        ranked_rows = _collect_ranked_gso_rows(
+            work,
+            expected_swarms=swarms,
+            steps=steps,
+            score_direction=NATIVE_SCORE_DIRECTION,
+        )
+        selected_rows = ranked_rows[:poses_per_case]
+        if not selected_rows:
+            raise RuntimeError("LightDock produced no globally rankable GSO rows")
+        selected = work / "selected_top_poses.gso"
+        selected.write_text(
+            "\n".join(row.raw_line for row in selected_rows) + "\n",
+            encoding="utf-8",
+        )
+        exits["conformations"] = self._run([str(self.conformation_executable), receptor.name, ligand.name, selected.name, str(len(selected_rows))], cwd=work, timeout_seconds=timeout_seconds, logs=logs, name="conformations")
         # Reuse the established Phase 2a exact chain/residue validator rather
         # than accepting an arbitrary ATOM-bearing PDB as a successful pose.
         from labmate.live_local import _pdb_chain_contract, _validate_lightdock_pose
         receptor_sequences, receptor_keys = _pdb_chain_contract(receptor)
         ligand_sequences, ligand_keys = _pdb_chain_contract(ligand)
-        _validate_lightdock_pose(
-            pose,
-            expected_sequences={**receptor_sequences, **ligand_sequences},
-            expected_residue_keys={**receptor_keys, **ligand_keys},
+        pose_records: list[DockingPoseRecord] = []
+        pose_paths: list[str] = []; pose_hashes: dict[str, str] = {}; native: list[dict[str, object]] = []
+        for row in selected_rows:
+            rank = row.global_tool_score_rank
+            generated = work / f"lightdock_{rank - 1}.pdb"
+            provenance = {
+                "gso_path": _relative(row.source_path, output),
+                "gso_sha256": row.source_sha256,
+                "global_rank_method": GLOBAL_RANK_METHOD,
+                "score_direction": NATIVE_SCORE_DIRECTION,
+            }
+            native.append(
+                {
+                    "global_tool_score_rank": rank,
+                    "swarm": row.swarm_id,
+                    "swarm_local_rank": row.swarm_local_rank,
+                    "gso_row_id": row.gso_row_id,
+                    "score": row.score,
+                    "score_name": NATIVE_SCORE_NAME,
+                    "score_direction": NATIVE_SCORE_DIRECTION,
+                }
+            )
+            if (
+                generated.is_symlink()
+                or not generated.is_file()
+                or generated.stat().st_size == 0
+                or b"ATOM" not in generated.read_bytes()
+            ):
+                pose_records.append(
+                    DockingPoseRecord(
+                        pose_index=rank,
+                        global_tool_score_rank=rank,
+                        tool_native_rank=rank,
+                        swarm_id=row.swarm_id,
+                        swarm_local_rank=row.swarm_local_rank,
+                        gso_row_id=row.gso_row_id,
+                        gso_row=row.gso_row_id,
+                        pose_path=None,
+                        pose_sha256=None,
+                        native_score=row.score,
+                        raw_native_score=row.score,
+                        native_score_name=NATIVE_SCORE_NAME,
+                        native_score_semantics=NATIVE_SCORE_SEMANTICS,
+                        global_rank_method=GLOBAL_RANK_METHOD,
+                        tie_break_fields=["numeric_swarm_id", "gso_row_id"],
+                        generation_status="failed",
+                        validation_status="not_run",
+                        failure_reason="generated pose was absent, unsafe, empty, or lacked ATOM records",
+                        provenance=provenance,
+                    )
+                )
+                continue
+            pose = poses / f"pose_{rank:03d}.pdb"
+            shutil.copy2(generated, pose)
+            try:
+                _validate_lightdock_pose(
+                    pose,
+                    expected_sequences={**receptor_sequences, **ligand_sequences},
+                    expected_residue_keys={**receptor_keys, **ligand_keys},
+                )
+            except Exception as exc:
+                pose_records.append(
+                    DockingPoseRecord(
+                        pose_index=rank,
+                        global_tool_score_rank=rank,
+                        tool_native_rank=rank,
+                        swarm_id=row.swarm_id,
+                        swarm_local_rank=row.swarm_local_rank,
+                        gso_row_id=row.gso_row_id,
+                        gso_row=row.gso_row_id,
+                        pose_path=None,
+                        pose_sha256=None,
+                        native_score=row.score,
+                        raw_native_score=row.score,
+                        native_score_name=NATIVE_SCORE_NAME,
+                        native_score_semantics=NATIVE_SCORE_SEMANTICS,
+                        global_rank_method=GLOBAL_RANK_METHOD,
+                        tie_break_fields=["numeric_swarm_id", "gso_row_id"],
+                        generation_status="succeeded",
+                        validation_status="failed",
+                        failure_reason=f"pose validation failed: {type(exc).__name__}",
+                        provenance=provenance,
+                    )
+                )
+                pose.unlink(missing_ok=True)
+                continue
+            relative_pose = _relative(pose, output)
+            pose_sha = _sha256(pose)
+            pose_paths.append(relative_pose)
+            pose_hashes[relative_pose] = pose_sha
+            pose_records.append(
+                DockingPoseRecord(
+                    pose_index=rank,
+                    global_tool_score_rank=rank,
+                    tool_native_rank=rank,
+                    swarm_id=row.swarm_id,
+                    swarm_local_rank=row.swarm_local_rank,
+                    gso_row_id=row.gso_row_id,
+                    gso_row=row.gso_row_id,
+                    pose_path=relative_pose,
+                    pose_sha256=pose_sha,
+                    native_score=row.score,
+                    raw_native_score=row.score,
+                    native_score_name=NATIVE_SCORE_NAME,
+                    native_score_semantics=NATIVE_SCORE_SEMANTICS,
+                    global_rank_method=GLOBAL_RANK_METHOD,
+                    tie_break_fields=["numeric_swarm_id", "gso_row_id"],
+                    generation_status="succeeded",
+                    validation_status="validated",
+                    provenance=provenance,
+                )
+            )
+        pose_records = _mark_duplicate_pose_groups(pose_records)
+        validated_records = [
+            record for record in pose_records if record.validation_status == "validated"
+        ]
+        if not validated_records:
+            raise RuntimeError("LightDock produced no validated poses")
+        selected_record = min(
+            validated_records, key=lambda record: record.global_tool_score_rank
         )
-        native = [{"swarm": 0, "gso_row": row_index, "score": score, "score_name": "fastdfire", "score_direction": "higher_is_better"}]
         finished = datetime.now(UTC)
         tool_versions = {"lightdock_version": self._version(), "setup_sha256":_sha256(self.setup_executable),"sampling_sha256":_sha256(self.sampling_executable),"conformation_sha256":_sha256(self.conformation_executable)}
-        result = DockingExecutionResult(1, "succeeded", "lightdock", "local_external_executable", ".", [_relative(pose, output)], {_relative(pose, output): _sha256(pose)}, native, "LightDock tool-native docking score (fastdfire); higher_is_better; not affinity", _relative(pose, output), f"highest explicit score in swarm_0/gso_{steps}.out", started.isoformat().replace("+00:00", "Z"), finished.isoformat().replace("+00:00", "Z"), round(time.monotonic()-timer,3), exits, tool_versions, [])
-        manifest = {"schema_version":1,"run_id":output.name,"mode":"local_docking_execution","status":result.status,"prediction_backend":docking_input.antibody_artifact.backend_name,"prediction_pdb_sha256":docking_input.antibody_artifact.pdb_sha256,"antibody_chain_map":docking_input.antibody_artifact.chain_map,"antigen_sha256":docking_input.antigen_pdb_sha256,"antigen_chains":docking_input.antigen_chains,"receptor_role":docking_input.receptor_role,"ligand_role":docking_input.ligand_role,"docking_backend":"lightdock","tool_version":tool_versions["lightdock_version"],"parameters":{"swarms":swarms,"glowworms":glowworms,"gso_steps":steps,"seed":seed,"timeout_seconds":timeout_seconds},"normalized_inputs":{"receptor":_relative(receptor,output),"ligand":_relative(ligand,output),"receptor_sha256":_sha256(receptor),"ligand_sha256":_sha256(ligand)},"exit_codes":exits,"pose_count":1,"pose_paths":result.pose_paths,"pose_sha256":result.pose_sha256,"native_scores":native,"selected_pose":result.selected_pose,"selected_pose_reason":result.selected_pose_reason,"validation_steps":["input_sha256","regular_files","explicit_gso_row","pose_atom_records"],"unsupported_claims":["no scientific docking validation","no affinity prediction","no experimental validation","no epitope validation","no cross-backend confidence comparison","no therapeutic claim"]}
+        result = DockingExecutionResult(1, "succeeded", "lightdock", "local_external_executable", ".", pose_paths, pose_hashes, native, NATIVE_SCORE_SEMANTICS, selected_record.pose_path, "first_validated_global_tool_score_rank", started.isoformat().replace("+00:00", "Z"), finished.isoformat().replace("+00:00", "Z"), round(time.monotonic()-timer,3), exits, tool_versions, [], poses_per_case, sum(record.generation_status == "succeeded" for record in pose_records), len(validated_records), pose_records)
+        manifest = {"schema_version":1,"run_id":output.name,"mode":"local_docking_execution","status":result.status,"prediction_backend":docking_input.antibody_artifact.backend_name,"prediction_pdb_sha256":docking_input.antibody_artifact.pdb_sha256,"antibody_chain_map":docking_input.antibody_artifact.chain_map,"antigen_sha256":docking_input.antigen_pdb_sha256,"antigen_chains":docking_input.antigen_chains,"receptor_role":docking_input.receptor_role,"ligand_role":docking_input.ligand_role,"docking_backend":"lightdock","tool_version":tool_versions["lightdock_version"],"parameters":{"swarms":swarms,"glowworms":glowworms,"gso_steps":steps,"seed":seed,"timeout_seconds":timeout_seconds,"poses_per_case":poses_per_case},"global_rank_method":GLOBAL_RANK_METHOD,"global_rank_is_lightdock_native_rank":False,"tie_break_fields":["numeric_swarm_id","gso_row_id"],"normalized_inputs":{"receptor":_relative(receptor,output),"ligand":_relative(ligand,output),"receptor_sha256":_sha256(receptor),"ligand_sha256":_sha256(ligand)},"exit_codes":exits,"pose_count":len(pose_records),"generated_pose_count":result.generated_pose_count,"validated_pose_count":result.validated_pose_count,"unique_validated_pose_count":len({record.pose_sha256 for record in validated_records}),"pose_paths":result.pose_paths,"pose_sha256":result.pose_sha256,"native_scores":native,"pose_records":[record.__dict__ for record in pose_records],"selected_pose":result.selected_pose,"selected_pose_reason":result.selected_pose_reason,"validation_steps":["input_sha256","regular_files","all_expected_swarm_directories","gso_sha256","global_tool_score_rank","pose_atom_records","exact_chain_sequence"],"unsupported_claims":["no LightDock-native cross-swarm rank","no scientific docking validation","no affinity prediction","no experimental validation","no epitope validation","no cross-backend confidence comparison","no therapeutic claim"]}
         (output / "docking_manifest.json").write_text(json.dumps(manifest, indent=2)+"\n", encoding="utf-8")
         return result
 

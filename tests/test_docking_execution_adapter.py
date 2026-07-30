@@ -33,7 +33,7 @@ def _handoff(tmp_path: Path) -> DockingInput:
     return docking_input(artifact, antigen_pdb=antigen, allowed_root=tmp_path, output_root=tmp_path / "handoff")
 
 
-def _executor(tmp_path: Path, *, sampling: str = "mkdir -p swarm_0\nprintf '%s\\n' '(0,0,0,0,0,0,0) 0 0 0 0 0 0 2.0' > swarm_0/gso_5.out\n") -> LocalLightDockExecutor:
+def _executor(tmp_path: Path, *, sampling: str = "mkdir -p swarm_0\nprintf '%s\\n' '(0,0,0,0,0,0,0) 0 0 0 0 0 2.0' > swarm_0/gso_5.out\n") -> LocalLightDockExecutor:
     setup = _script(tmp_path / "setup", "printf '{}' > setup.json\n")
     sample = _script(tmp_path / "sample", sampling)
     conform = _script(tmp_path / "conform", 'cat "$1" "$2" > lightdock_0.pdb\n')
@@ -47,6 +47,126 @@ def test_fake_lightdock_executes_explicit_gso_to_validated_pose(tmp_path: Path) 
     assert result.native_scores[0]["score"] == 2.0
     assert (tmp_path / "output" / "docking_manifest.json").is_file()
     assert (tmp_path / "output" / "poses" / "pose_001.pdb").read_bytes().startswith(b"ATOM")
+
+
+def test_fake_lightdock_preserves_tool_native_multi_pose_order(tmp_path: Path) -> None:
+    setup = _script(tmp_path / "setup", "printf '{}' > setup.json\n")
+    sampling = _script(
+        tmp_path / "sample",
+        """\
+mkdir -p swarm_0 swarm_1 swarm_2
+printf '%s\n' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 9.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 6.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 3.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 0.0' > swarm_0/gso_5.out
+printf '%s\n' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 8.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 5.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 2.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 -1.0' > swarm_1/gso_5.out
+printf '%s\n' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 7.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 4.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 1.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 -2.0' > swarm_2/gso_5.out
+""",
+    )
+    conform = _script(
+        tmp_path / "conform",
+        'count="$4"\nindex=0\nwhile [ "$index" -lt "$count" ]; do cat "$1" "$2" > "lightdock_$index.pdb"; printf "REMARK SYNTHETIC TEST FIXTURE %s\\n" "$index" >> "lightdock_$index.pdb"; index=$((index + 1)); done\n',
+    )
+    executor = LocalLightDockExecutor(setup_executable=setup, sampling_executable=sampling, conformation_executable=conform)
+    result = executor.execute(_handoff(tmp_path), allowed_root=tmp_path, output_dir=tmp_path / "output", timeout_seconds=10, swarms=3, poses_per_case=10)
+    assert [row.native_score for row in result.pose_records] == [9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0, 0.0]
+    assert [row.swarm_id for row in result.pose_records] == [0, 1, 2, 0, 1, 2, 0, 1, 2, 0]
+    assert [row.global_tool_score_rank for row in result.pose_records] == list(range(1, 11))
+    assert [row.tool_native_rank for row in result.pose_records] == list(range(1, 11))
+    assert len(set(result.pose_sha256.values())) == 10
+    assert all(row.global_rank_method == "lightdock_native_score_cross_swarm_sort_v1" for row in result.pose_records)
+    assert result.selected_pose == "poses/pose_001.pdb"
+    manifest = (tmp_path / "output" / "docking_manifest.json").read_text(encoding="utf-8")
+    assert '"global_rank_is_lightdock_native_rank": false' in manifest
+    assert '"affinity":' not in manifest.lower()
+
+
+def test_cross_swarm_tie_break_and_failed_rank_do_not_reorder(tmp_path: Path) -> None:
+    setup = _script(tmp_path / "setup", "printf '{}' > setup.json\n")
+    sampling = _script(
+        tmp_path / "sample",
+        """\
+mkdir -p swarm_0 swarm_1
+printf '%s\n' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 5.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 3.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 1.0' > swarm_0/gso_5.out
+printf '%s\n' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 5.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 4.0' \
+  '(0,0,0,0,0,0,0) 0 0 0 0 0 2.0' > swarm_1/gso_5.out
+""",
+    )
+    conform = _script(
+        tmp_path / "conform",
+        'count="$4"\nindex=0\nwhile [ "$index" -lt "$count" ]; do if [ "$index" -ne 3 ]; then cat "$1" "$2" > "lightdock_$index.pdb"; fi; index=$((index + 1)); done\n',
+    )
+    result = LocalLightDockExecutor(
+        setup_executable=setup,
+        sampling_executable=sampling,
+        conformation_executable=conform,
+    ).execute(
+        _handoff(tmp_path),
+        allowed_root=tmp_path,
+        output_dir=tmp_path / "output",
+        timeout_seconds=10,
+        swarms=2,
+        poses_per_case=6,
+    )
+    assert [(row.global_tool_score_rank, row.swarm_id, row.gso_row_id) for row in result.pose_records[:2]] == [(1, 0, 0), (2, 1, 0)]
+    assert result.pose_records[3].global_tool_score_rank == 4
+    assert result.pose_records[3].generation_status == "failed"
+    assert result.pose_records[4].global_tool_score_rank == 5
+    assert result.selected_pose_reason == "first_validated_global_tool_score_rank"
+
+
+@pytest.mark.parametrize(
+    ("sampling", "swarms", "message"),
+    [
+        (
+            "mkdir -p swarm_0\nprintf '%s\\n' '(0,0,0,0,0,0,0) 0 0 0 0 0 1.0' > swarm_0/gso_5.out\n",
+            2,
+            "swarm set mismatch",
+        ),
+        ("mkdir -p swarm_bad\n", 1, "malformed LightDock swarm"),
+        (
+            "mkdir real_swarm\nln -s real_swarm swarm_0\n",
+            1,
+            "not a regular directory",
+        ),
+    ],
+)
+def test_cross_swarm_discovery_fails_closed(
+    tmp_path: Path, sampling: str, swarms: int, message: str
+) -> None:
+    with pytest.raises(RuntimeError, match=message):
+        _executor(tmp_path, sampling=sampling).execute(
+            _handoff(tmp_path),
+            allowed_root=tmp_path,
+            output_dir=tmp_path / "output",
+            timeout_seconds=10,
+            swarms=swarms,
+        )
+
+
+def test_poses_per_case_upper_bound(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="poses_per_case"):
+        _executor(tmp_path).execute(
+            _handoff(tmp_path),
+            allowed_root=tmp_path,
+            output_dir=tmp_path / "output",
+            timeout_seconds=10,
+            poses_per_case=101,
+        )
 
 
 def test_fake_lightdock_nonzero_and_timeout_fail_closed(tmp_path: Path) -> None:

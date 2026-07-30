@@ -9,6 +9,13 @@
 > public-data manifest contract but no DB5.5 download, pilot, or general
 > scientific benchmark result.
 
+> **Benchmark metrics:** versioned CAPRI Fnat/I-RMSD/L-RMSD and traditional
+> quality categories are implemented separately from legacy metrics. The
+> implementation agrees with official DockQ v2.1.3 on five synthetic cases and
+> the official 1A2K example within strict numerical tolerances. Cross-swarm
+> multi-pose ordering is a Labmate-derived `global_tool_score_rank`, not a
+> LightDock-native global rank. No public DB5.5 pilot result is claimed here.
+
 > **v0.3.0 · REPLAY + VERIFIED LIVE LOCAL + IMPLEMENTED-UNVERIFIED BENCHMARK LOCAL · NO LIVE REMOTE**
 
 本版本保留 Phase 1 Replay MVP，并新增 Phase 2a Live Local CLI。Replay 接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行固定产物重放。运行时会重新完成 PDB 解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。
@@ -301,6 +308,7 @@ RUN_ID/
 - LightDockProvider：默认 docking provider 契约，`replay_only`。只实现固定 CSV/PDB schema 解析；调用 `dock()` 会抛出明确错误。
 - Live Local：`verified_live`，仅本机 CLI；验证范围为 ColabFold 1.6.2、离线 `single_sequence`、预装 multimer-v3 权重、外部 LightDock 0.9.4 和一候选小规模 smoke 参数。其他版本、MSA-backed 模式、评分函数、规模和科学有效性不在该状态范围内。
 - Benchmark Local：`implemented_unverified`，本地 PDB→外部 LightDock→界面与可选 reference 指标已实现，并完成一次记录在案的真实 LightDock 0.9.4 synthetic 软件集成 smoke；尚未完成 DB5.5 科学 benchmark。
+- Public benchmark framework：data contract、`capri_dockq_2016_v1` metrics、传统 CAPRI category 与跨 swarm multi-pose provenance 已通过 synthetic/official-DockQ 实现验证；公开 DB5.5 pilot 尚未运行，因此没有公开 top-k 科学结果。
 - Live Remote：`unavailable`。
 - ElliDockProvider/HDOCKProvider：Phase 1 不创建虚假 skeleton，也不出现在可运行选择框。
 - 普通 DiffDock：不属于蛋白–蛋白 docking 后端。

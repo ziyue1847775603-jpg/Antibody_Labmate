@@ -19,7 +19,8 @@ function, seed policy, swarms, glowworms and GSO steps. No per-case tuning is
 permitted. Tool-native pose order is retained; prediction confidence is not a
 ranking input.
 
-CAPRI category calculation is deliberately not implemented in Stage 1. It will
-require a separately reviewed authoritative definition and synthetic boundary
-tests. A small pilot cannot establish general scientific validity, affinity,
-experimental binding, or therapeutic relevance.
+Stage 1 now includes the versioned `capri_dockq_2016_v1` implementation,
+traditional CAPRI category boundary tests, official DockQ numerical
+cross-validation, and cross-swarm multi-pose provenance. A public DB5.5 pilot
+has not yet been run. A small pilot cannot establish general scientific
+validity, affinity, experimental binding, or therapeutic relevance.

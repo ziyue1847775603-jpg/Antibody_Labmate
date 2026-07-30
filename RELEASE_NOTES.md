@@ -54,6 +54,25 @@
   an IgFold prediction artifact as ligand. This verifies software integration,
   not pose correctness, affinity, epitope, DB5.5 performance, or experiments.
 
+### Benchmark metrics and cross-swarm provenance
+
+- Added a separate `capri_dockq_2016_v1` implementation of Fnat, interface
+  RMSD and ligand RMSD plus the traditional CAPRI four-category criteria.
+  The legacy `compute_reference_metrics` implementation and all existing
+  Replay/Live Local ranking behavior remain unchanged.
+- Cross-validated Fnat/I-RMSD/L-RMSD against official DockQ v2.1.3
+  (`d9cbb1940bb0f42db3257f7da3b0e96f162b94d9`) on five synthetic cases and
+  its official 1A2K example. This validates implementation agreement only; it
+  is not a public scientific benchmark.
+- Extended the independent LightDock executor to collect all current-run
+  `swarm_<id>` outputs and derive `global_tool_score_rank` from one native
+  scoring function with deterministic swarm/row tie breaks. LightDock does
+  not supply this cross-swarm global rank, and Labmate does not describe it as
+  one. Failed and duplicate poses retain their original derived rank.
+- Added a frozen benchmark run configuration and tool-ranked top-1/top-5/
+  top-10 aggregation with a separately labelled reference-selected oracle.
+  No DB5.5 data or public benchmark result is bundled.
+
 ### Input-contract hardening (uncommitted branch)
 
 - Clarified that six CDR strings are only a fixed Replay demonstration input;

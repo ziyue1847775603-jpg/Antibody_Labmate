@@ -99,6 +99,12 @@ def build_parser() -> argparse.ArgumentParser:
     dock.add_argument("--gso-steps", type=int, default=5)
     dock.add_argument("--seed", type=int, default=0)
     dock.add_argument("--timeout-seconds", type=int, default=1800)
+    dock.add_argument(
+        "--poses-per-case",
+        type=int,
+        default=1,
+        help="cross-swarm native-score-ordered GSO rows to retain (1..100)",
+    )
 
     benchmark = subcommands.add_parser(
         "benchmark", help="validate public docking benchmark metadata; local-only"
@@ -240,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
                 steps=args.gso_steps,
                 seed=args.seed,
                 timeout_seconds=args.timeout_seconds,
+                poses_per_case=args.poses_per_case,
             )
             print(json.dumps({"status": result.status, "docking_backend": result.docking_backend, "selected_pose": result.selected_pose, "native_scores": result.native_scores}, ensure_ascii=False, indent=2))
             return 0

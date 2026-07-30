@@ -76,6 +76,12 @@ REQUIRED_RELEASE_PATHS = {
     "docs/igcraft_evaluation.md",
     "docs/benchmark_data_contract.md",
     "docs/benchmark_plan.md",
+    "docs/benchmark_metrics.md",
+    "docs/benchmark_multipose.md",
+    "labmate/benchmarking/metrics.py",
+    "labmate/benchmarking/evaluation.py",
+    "tests/test_benchmark_metrics.py",
+    "tests/test_benchmark_evaluation.py",
     "labmate/workers/__init__.py",
     "labmate/workers/igfold_worker.py",
 }
@@ -209,7 +215,7 @@ def audit_archive(output: Path) -> None:
                     raise RuntimeError(f"Release ZIP local-path scan matched {label}: {name}")
 
 
-def build(output: Path) -> Path:
+def write_source_checksums() -> Path:
     checksum_path = ROOT / "SOURCE_CHECKSUMS.sha256"
     before_checksum = [path for path in included_files() if path != checksum_path]
     audit_release_files(before_checksum)
@@ -226,6 +232,11 @@ def build(output: Path) -> Path:
         )
         + line_ending
     )
+    return checksum_path
+
+
+def build(output: Path) -> Path:
+    write_source_checksums()
     output = output.resolve()
     try:
         output.relative_to(ROOT)
@@ -250,6 +261,11 @@ def build(output: Path) -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--checksums-only",
+        action="store_true",
+        help="refresh SOURCE_CHECKSUMS.sha256 without creating a release ZIP",
+    )
+    parser.add_argument(
         "output",
         nargs="?",
         type=Path,
@@ -257,6 +273,9 @@ def main() -> int:
         / f"Antibody_Labmate_Backend_Architecture_v{project_version()}.zip",
     )
     args = parser.parse_args()
+    if args.checksums_only:
+        print(write_source_checksums())
+        return 0
     print(build(args.output))
     return 0
 
