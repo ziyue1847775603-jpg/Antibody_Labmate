@@ -5,6 +5,10 @@
 > complete VH/VL locally. Real local computation requires complete paired VH/VL
 > sequences or a locally validated PredictionArtifact.
 
+> **Public scientific benchmark:** planned. The repository contains a Stage 1
+> public-data manifest contract but no DB5.5 download, pilot, or general
+> scientific benchmark result.
+
 > **v0.3.0 · REPLAY + VERIFIED LIVE LOCAL + IMPLEMENTED-UNVERIFIED BENCHMARK LOCAL · NO LIVE REMOTE**
 
 本版本保留 Phase 1 Replay MVP，并新增 Phase 2a Live Local CLI。Replay 接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行固定产物重放。运行时会重新完成 PDB 解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。

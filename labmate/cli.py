@@ -18,6 +18,7 @@ from labmate.backends.benchmark import BenchmarkLocalBackend
 from labmate.benchmark_local import load_benchmark_local_project
 from labmate.docking.registry import capability_matrix
 from labmate.docking.lightdock import LocalLightDockExecutor
+from labmate.benchmarking import load_manifest
 from labmate.prediction_artifact import DockingInput
 from labmate.errors import LabmateError
 from labmate.workflow import load_project
@@ -98,6 +99,17 @@ def build_parser() -> argparse.ArgumentParser:
     dock.add_argument("--gso-steps", type=int, default=5)
     dock.add_argument("--seed", type=int, default=0)
     dock.add_argument("--timeout-seconds", type=int, default=1800)
+
+    benchmark = subcommands.add_parser(
+        "benchmark", help="validate public docking benchmark metadata; local-only"
+    )
+    benchmark_commands = benchmark.add_subparsers(
+        dest="benchmark_command", required=True
+    )
+    benchmark_validate = benchmark_commands.add_parser(
+        "validate", help="validate hashes and bound/unbound isolation; does not run docking"
+    )
+    benchmark_validate.add_argument("--manifest", required=True, type=Path)
     heavy_input = predict.add_mutually_exclusive_group(required=True)
     heavy_input.add_argument("--heavy-chain", help="complete heavy variable-domain sequence required")
     heavy_input.add_argument("--heavy-chain-file", type=Path)
@@ -230,6 +242,22 @@ def main(argv: list[str] | None = None) -> int:
                 timeout_seconds=args.timeout_seconds,
             )
             print(json.dumps({"status": result.status, "docking_backend": result.docking_backend, "selected_pose": result.selected_pose, "native_scores": result.native_scores}, ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "benchmark":
+            manifest = load_manifest(args.manifest)
+            print(
+                json.dumps(
+                    {
+                        "status": "validated",
+                        "dataset_name": manifest.dataset_name,
+                        "dataset_version": manifest.dataset_version,
+                        "case_count": len(manifest.cases),
+                        "scientific_benchmark_run": False,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
             return 0
         if args.mode == "replay":
             prediction_backend_name = args.prediction_backend or "replay"

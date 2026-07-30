@@ -74,6 +74,8 @@ REQUIRED_RELEASE_PATHS = {
     "docs/docking_execution.md",
     "docs/input_contracts.md",
     "docs/igcraft_evaluation.md",
+    "docs/benchmark_data_contract.md",
+    "docs/benchmark_plan.md",
     "labmate/workers/__init__.py",
     "labmate/workers/igfold_worker.py",
 }
