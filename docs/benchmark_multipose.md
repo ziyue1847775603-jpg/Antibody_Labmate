@@ -20,9 +20,18 @@ described as a LightDock-native global rank. Each pose records the score,
 direction, swarm-local rank, GSO row, GSO hash, derived global rank, generation
 and validation status, and duplicate-hash group.
 
+For the supported LightDock 0.9.4 execution contract, the installed tool
+declares `fastdfire` as its default scoring function and its GSO update favors
+larger scoring/luciferin values. Labmate therefore declares the exact
+`fastdfire; higher_is_better` semantics once per execution and derives the
+sort direction from that declaration. Mixing score names or semantics across
+swarm rows fails closed.
+
 Failure does not close rank gaps or renumber later rows. If derived rank 1
 fails validation, selection uses
 `first_validated_global_tool_score_rank`; if no pose validates, execution fails.
+The failed rank remains in `pose_records`, later ranks are not renumbered, and
+the manifest contains an explicit warning when rank 1 could not be selected.
 Duplicate hashes remain as separate ranked records and are reported rather than
 removed.
 
