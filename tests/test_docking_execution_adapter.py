@@ -76,6 +76,29 @@ def test_fake_lightdock_executes_explicit_gso_to_validated_pose(tmp_path: Path) 
     assert (tmp_path / "output" / "poses" / "pose_001.pdb").read_bytes().startswith(b"ATOM")
 
 
+def test_explicit_lightdock_cores_are_forwarded_and_recorded(tmp_path: Path) -> None:
+    sampling = (
+        'printf "%s\\n" "$@" > sampling_args.txt\n'
+        "mkdir -p swarm_0\n"
+        "printf '%s\\n' '(0,0,0,0,0,0,0) 0 0 0 0 0 2.0' > swarm_0/gso_5.out\n"
+    )
+    result = _executor(tmp_path, sampling=sampling).execute(
+        _handoff(tmp_path),
+        allowed_root=tmp_path,
+        output_dir=tmp_path / "output",
+        timeout_seconds=10,
+        cores=3,
+    )
+    assert (tmp_path / "output" / "work" / "sampling_args.txt").read_text(
+        encoding="utf-8"
+    ).splitlines() == ["setup.json", "5", "-c", "3", "-sg", "0"]
+    manifest = json.loads(
+        (tmp_path / "output" / "docking_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["parameters"]["cores"] == 3
+    assert result.status == "succeeded"
+
+
 def test_fake_lightdock_preserves_tool_native_multi_pose_order(tmp_path: Path) -> None:
     setup = _script(tmp_path / "setup", "printf '{}' > setup.json\n")
     sampling = _script(

@@ -100,6 +100,12 @@ def build_parser() -> argparse.ArgumentParser:
     dock.add_argument("--seed", type=int, default=0)
     dock.add_argument("--timeout-seconds", type=int, default=1800)
     dock.add_argument(
+        "--lightdock-cores",
+        type=int,
+        default=1,
+        help="explicit LightDock --cores value; execution control only (default: 1)",
+    )
+    dock.add_argument(
         "--poses-per-case",
         type=int,
         default=1,
@@ -247,6 +253,7 @@ def main(argv: list[str] | None = None) -> int:
                 seed=args.seed,
                 timeout_seconds=args.timeout_seconds,
                 poses_per_case=args.poses_per_case,
+                cores=args.lightdock_cores,
             )
             print(json.dumps({"status": result.status, "docking_backend": result.docking_backend, "selected_pose": result.selected_pose, "native_scores": result.native_scores}, ensure_ascii=False, indent=2))
             return 0
