@@ -18,6 +18,8 @@ from labmate.backends.benchmark import BenchmarkLocalBackend
 from labmate.benchmark_local import load_benchmark_local_project
 from labmate.docking.registry import capability_matrix
 from labmate.docking.lightdock import LocalLightDockExecutor
+from labmate.design import DesignInput, RFantibodyBackend
+from labmate.design.artifact import sha256
 from labmate.benchmarking import load_manifest
 from labmate.prediction_artifact import DockingInput
 from labmate.errors import LabmateError
@@ -105,6 +107,22 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="explicit LightDock --cores value; execution control only (default: 1)",
     )
+
+    design = subcommands.add_parser(
+        "design", help="run one local RFantibody VHH candidate-generation stage; no affinity prediction",
+    )
+    design.add_argument("--design-backend", choices=["rfantibody"], default="rfantibody")
+    design.add_argument("--target-pdb", required=True, type=Path)
+    design.add_argument("--target-chains", required=True, help="explicit antigen PDB chain IDs, comma-separated")
+    design.add_argument("--hotspots", required=True, help="explicit antigen hotspots, e.g. C:200,C:169")
+    design.add_argument("--antibody-format", choices=["vhh"], default="vhh")
+    design.add_argument("--candidate-count", type=int, default=1)
+    design.add_argument("--seed", type=int, default=0)
+    design.add_argument("--output", required=True, type=Path)
+    design.add_argument("--rfantibody-python", required=True, type=Path)
+    design.add_argument("--rfantibody-root", required=True, type=Path)
+    design.add_argument("--resume-backbone", type=Path, help="verified full H/T RFdiffusion intermediate; resumes at official ProteinMPNN")
+    design.add_argument("--timeout-seconds", type=int, default=3600)
     dock.add_argument(
         "--poses-per-case",
         type=int,
@@ -257,6 +275,36 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(json.dumps({"status": result.status, "docking_backend": result.docking_backend, "selected_pose": result.selected_pose, "native_scores": result.native_scores}, ensure_ascii=False, indent=2))
             return 0
+        if args.command == "design":
+            target = args.target_pdb.resolve()
+            root = project_root()
+            try:
+                relative_target = target.relative_to(root.resolve()).as_posix()
+            except ValueError as exc:
+                raise LabmateError("--target-pdb must be inside the local project root") from exc
+            design_input = DesignInput(
+                target_pdb=relative_target,
+                target_sha256=sha256(target),
+                target_chains=[item.strip() for item in args.target_chains.split(",") if item.strip()],
+                hotspot_residues=[item.strip() for item in args.hotspots.split(",") if item.strip()],
+                antibody_format=args.antibody_format,
+                candidate_count=args.candidate_count,
+                seed=args.seed,
+                parameters={"design_loops": "official_vhh_default", "deterministic": True},
+                resume_backbone_pdb=(args.resume_backbone.resolve().relative_to(root.resolve()).as_posix() if args.resume_backbone is not None else None),
+                resume_backbone_sha256=(sha256(args.resume_backbone.resolve()) if args.resume_backbone is not None else None),
+            )
+            backend = RFantibodyBackend(
+                python=args.rfantibody_python,
+                root=args.rfantibody_root,
+                timeout_seconds=args.timeout_seconds,
+            )
+            artifact = backend.execute(design_input, allowed_root=root, output_dir=args.output)
+            (args.output / "design_artifact.json").write_text(
+                artifact.model_dump_json(indent=2) + "\n", encoding="utf-8"
+            )
+            print(json.dumps({"status": artifact.status, "backend": artifact.backend, "candidate_count": len(artifact.candidates), "generation_order_is_ranking": False}, ensure_ascii=False, indent=2))
+            return 0 if artifact.status == "success" and artifact.prediction_ready else 2
         if args.command == "benchmark":
             manifest = load_manifest(args.manifest)
             print(

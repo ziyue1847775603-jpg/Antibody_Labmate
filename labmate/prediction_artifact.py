@@ -100,16 +100,22 @@ def _safe_native(value: object) -> object:
 
 
 def prediction_artifact(
-    result: PredictionResult, *, heavy_chain: str, light_chain: str, allowed_root: Path, source_run_id: str = "prediction-only"
+    result: PredictionResult, *, heavy_chain: str, light_chain: str | None, allowed_root: Path, source_run_id: str = "prediction-only"
 ) -> PredictionArtifact:
+    design_stage = result.metadata.get("design_stage")
+    if design_stage is not None and design_stage != "sequence_validated":
+        raise ValueError("backbone-only or partial design output cannot enter PredictionArtifact")
     if result.status != "succeeded" or result.pdb_path is None:
         raise ValueError("only succeeded prediction results can enter docking")
     path = _inside(Path(result.pdb_path), allowed_root)
     observed, atoms = _chains(path)
-    matches = {role: [chain for chain, sequence in observed.items() if sequence == expected] for role, expected in {"heavy": heavy_chain, "light": light_chain}.items()}
-    if any(len(chains) != 1 for chains in matches.values()) or matches["heavy"] == matches["light"]:
+    expected_sequences = {"heavy": heavy_chain}
+    if light_chain is not None:
+        expected_sequences["light"] = light_chain
+    matches = {role: [chain for chain, sequence in observed.items() if sequence == expected] for role, expected in expected_sequences.items()}
+    if any(len(chains) != 1 for chains in matches.values()) or len(set(chain[0] for chain in matches.values())) != len(matches):
         raise ValueError("heavy/light chain mapping is missing or ambiguous")
-    if len(observed) != 2:
+    if len(observed) != len(expected_sequences):
         raise ValueError("antibody prediction contains an unexpected extra protein chain")
     root = allowed_root.resolve()
     native = _safe_native(result.metadata.get("native_metrics", {}))
@@ -118,8 +124,8 @@ def prediction_artifact(
         backend_name=result.backend_name,
         pdb_path=path.relative_to(root).as_posix(), pdb_sha256=_sha(path),
         chain_map={role: chains[0] for role, chains in matches.items()},
-        input_sequences={"heavy": heavy_chain, "light": light_chain}, observed_sequences={"heavy": heavy_chain, "light": light_chain},
-        residue_counts={role: len(sequence) for role, sequence in {"heavy": heavy_chain, "light": light_chain}.items()}, atom_count=atoms,
+        input_sequences=expected_sequences, observed_sequences=expected_sequences,
+        residue_counts={role: len(sequence) for role, sequence in expected_sequences.items()}, atom_count=atoms,
         native_metrics=native if isinstance(native, dict) else {}, native_metrics_semantics=semantics,
         warnings=list(result.warnings), provenance={"prediction_backend": result.backend_name, "execution_mode": str(result.metadata.get("execution_kind", "unknown")), "source_run_identifier": source_run_id, "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"), "validation_method": "exact_chain_sequence_and_sha256"},
     )

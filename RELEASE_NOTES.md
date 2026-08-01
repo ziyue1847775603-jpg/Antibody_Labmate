@@ -80,6 +80,20 @@
   rank-2–10 evaluation, top-k result, oracle, benchmark success rate, affinity,
   or general-performance claim is emitted.
 
+### RFantibody sequence-design workflow
+
+- Added a local-only external-interpreter bridge for the official RFantibody
+  VHH sequence workflow. It retains RFdiffusion output only as a
+  `backbone_generated` intermediate and requires official ProteinMPNN output,
+  sequence threading, exact FASTA/PDB agreement, finite-coordinate checks and
+  fixed-framework backbone validation before a candidate is prediction-ready.
+- The bridge records RFdiffusion and ProteinMPNN checkpoint provenance,
+  controlled candidate FASTA/PDB paths and unscaled ProteinMPNN negative
+  log-likelihood. It does not create affinity, binder, therapeutic, unified
+  quality, or cross-stage scores.
+- RFantibody and ProteinMPNN remain external user-managed software; no source,
+  environment, checkpoint, cache, or generated candidate is distributed.
+
 ### Input-contract hardening (uncommitted branch)
 
 - Clarified that six CDR strings are only a fixed Replay demonstration input;

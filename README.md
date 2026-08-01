@@ -362,6 +362,18 @@ a LightDock native score is not affinity and the smoke is not scientific,
 epitope, binding or experimental validation. See
 [docking execution details](docs/docking_execution.md).
 
+### RFantibody VHH sequence design
+
+The local-only `labmate design` command has a verified RFantibody VHH route
+that separates an RFdiffusion backbone intermediate from a final
+sequence-validated ProteinMPNN candidate. Only an exact FASTA/threaded-PDB
+match with complete provenance is prediction-ready. Generation order is not a
+quality rank, and the ProteinMPNN native negative log-likelihood is not
+affinity or a cross-stage score. See [the RFantibody integration
+boundary](docs/rfantibody_integration.md) and [the DesignArtifact
+contract](docs/design_artifact_contract.md). The web demo and Docker image do
+not run RFantibody or ProteinMPNN.
+
 - 应用内 IgCraft 执行与模型验证；
 - ColabFold 公共或本地 MSA-backed 模式、模板模式、其他版本/模型、批量规模与性能；
 - LightDock 其他版本、评分函数、大规模参数、性能与任何 GPL 组合分发；
