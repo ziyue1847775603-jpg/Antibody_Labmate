@@ -78,6 +78,7 @@ REQUIRED_RELEASE_PATHS = {
     "docs/benchmark_plan.md",
     "docs/benchmark_metrics.md",
     "docs/benchmark_multipose.md",
+    "docs/benchmark_pilot_1ahw.md",
     "labmate/benchmarking/metrics.py",
     "labmate/benchmarking/evaluation.py",
     "tests/test_benchmark_metrics.py",

@@ -5,16 +5,18 @@
 > complete VH/VL locally. Real local computation requires complete paired VH/VL
 > sequences or a locally validated PredictionArtifact.
 
-> **Public scientific benchmark:** planned. The repository contains a Stage 1
-> public-data manifest contract but no DB5.5 download, pilot, or general
-> scientific benchmark result.
+> **Public scientific benchmark:** one frozen 1AHW engineering pilot completed
+> local docking only. It does not establish a top-k result, general benchmark
+> performance, docking accuracy, affinity, or experimental validity.
 
 > **Benchmark metrics:** versioned CAPRI Fnat/I-RMSD/L-RMSD and traditional
 > quality categories are implemented separately from legacy metrics. The
 > implementation agrees with official DockQ v2.1.3 on five synthetic cases and
-> the official 1A2K example within strict numerical tolerances. Cross-swarm
+> the official 1A2K example within strict numerical tolerances. For conventional
+> H/L antibody groups, DockQ v2.1.3 remains pairwise diagnostic only: it cannot
+> provide Labmate's antigen-versus-H/L-group semantic L-RMSD. Cross-swarm
 > multi-pose ordering is a Labmate-derived `global_tool_score_rank`, not a
-> LightDock-native global rank. No public DB5.5 pilot result is claimed here.
+> LightDock-native global rank. See [`docs/benchmark_pilot_1ahw.md`](docs/benchmark_pilot_1ahw.md).
 
 > **v0.3.0 · REPLAY + VERIFIED LIVE LOCAL + IMPLEMENTED-UNVERIFIED BENCHMARK LOCAL · NO LIVE REMOTE**
 

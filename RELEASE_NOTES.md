@@ -72,6 +72,13 @@
 - Added a frozen benchmark run configuration and tool-ranked top-1/top-5/
   top-10 aggregation with a separately labelled reference-selected oracle.
   No DB5.5 data or public benchmark result is bundled.
+- Ran and froze one 1AHW local docking engineering pilot with 10 swarms and
+  10 validated tool-ranked poses after an earlier bounded timeout. Its rank-1
+  Labmate grouped CAPRI result was `incorrect`. DockQ v2.1.3 pairwise outputs
+  are retained only as diagnostics: its chain-group conversion changes the
+  receptor/ligand semantic L-RMSD for this conventional H/L case. Therefore no
+  rank-2–10 evaluation, top-k result, oracle, benchmark success rate, affinity,
+  or general-performance claim is emitted.
 
 ### Input-contract hardening (uncommitted branch)
 
