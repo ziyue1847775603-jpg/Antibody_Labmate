@@ -77,7 +77,10 @@ st.info(
 
     具备本地 GPU 和所需外部工具环境的用户，可按照 GitHub 文档运行：
 
-    **RFantibody → ProteinMPNN → ColabFold（AlphaFold2-based）→ LightDock**
+    **ColabFold（AlphaFold2-based）→ LightDock**
+
+    独立的 `labmate design` 命令支持 RFantibody VHH 设计通道（RFdiffusion → ProteinMPNN），
+    与 Live Local 主流程分开；RF2 复合物预测/筛选尚未集成。
 
     当前公开网页仍运行 Replay 演示，不在公共 Streamlit 服务执行实时计算。
 
