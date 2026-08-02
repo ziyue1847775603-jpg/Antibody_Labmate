@@ -93,6 +93,11 @@
   quality, or cross-stage scores.
 - RFantibody and ProteinMPNN remain external user-managed software; no source,
   environment, checkpoint, cache, or generated candidate is distributed.
+- Completed one local VHH engineering handoff from a sequence-validated
+  RFantibody/ProteinMPNN candidate through offline ColabFold and independent
+  LightDock execution. The resulting ten tool-ranked poses verify engineering
+  provenance and output validation only; no binder, affinity, epitope, or
+  experimental-validation claim is made.
 
 ### Input-contract hardening (uncommitted branch)
 

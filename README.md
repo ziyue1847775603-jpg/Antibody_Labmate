@@ -374,6 +374,12 @@ boundary](docs/rfantibody_integration.md) and [the DesignArtifact
 contract](docs/design_artifact_contract.md). The web demo and Docker image do
 not run RFantibody or ProteinMPNN.
 
+One local engineering smoke has carried a sequence-validated VHH through
+offline ColabFold into the independent LightDock executor and produced ten
+validated tool-ranked poses. This verifies only the artifact handoff and
+provenance contracts; it is not binding, affinity, epitope, or experimental
+validation.
+
 - 应用内 IgCraft 执行与模型验证；
 - ColabFold 公共或本地 MSA-backed 模式、模板模式、其他版本/模型、批量规模与性能；
 - LightDock 其他版本、评分函数、大规模参数、性能与任何 GPL 组合分发；
