@@ -10,6 +10,7 @@ from labmate.docking.lightdock import (
     LocalLightDockExecutor,
     _UnrankedGsoRow,
     _rank_gso_rows,
+    _validate_pose_chain_contract,
 )
 from labmate.prediction_artifact import DockingInput, docking_input, prediction_artifact
 
@@ -38,6 +39,21 @@ def _handoff(tmp_path: Path) -> DockingInput:
     result = PredictionResult(pdb_path=antibody, backend_name="igfold", status="succeeded")
     artifact = prediction_artifact(result, heavy_chain="ACDE", light_chain="FGHI", allowed_root=tmp_path)
     return docking_input(artifact, antigen_pdb=antigen, allowed_root=tmp_path, output_root=tmp_path / "handoff")
+
+
+def _vhh_handoff(tmp_path: Path) -> DockingInput:
+    antibody, antigen = tmp_path / "antibody.pdb", tmp_path / "antigen.pdb"
+    _pdb(antibody, {"A": "ACDE"}); _pdb(antigen, {"C": "FGHI"})
+    result = PredictionResult(pdb_path=antibody, backend_name="colabfold", status="succeeded")
+    artifact = prediction_artifact(
+        result, heavy_chain="ACDE", light_chain=None, allowed_root=tmp_path
+    )
+    return docking_input(
+        artifact,
+        antigen_pdb=antigen,
+        allowed_root=tmp_path,
+        output_root=tmp_path / "handoff",
+    )
 
 
 def _executor(tmp_path: Path, *, sampling: str = "mkdir -p swarm_0\nprintf '%s\\n' '(0,0,0,0,0,0,0) 0 0 0 0 0 2.0' > swarm_0/gso_5.out\n") -> LocalLightDockExecutor:
@@ -74,6 +90,28 @@ def test_fake_lightdock_executes_explicit_gso_to_validated_pose(tmp_path: Path) 
     assert result.native_scores[0]["score"] == 2.0
     assert (tmp_path / "output" / "docking_manifest.json").is_file()
     assert (tmp_path / "output" / "poses" / "pose_001.pdb").read_bytes().startswith(b"ATOM")
+
+
+def test_vhh_pose_contract_allows_exact_antigen_and_single_ligand_chains(
+    tmp_path: Path,
+) -> None:
+    result = _executor(tmp_path).execute(
+        _vhh_handoff(tmp_path),
+        allowed_root=tmp_path,
+        output_dir=tmp_path / "output",
+        timeout_seconds=10,
+    )
+    pose = tmp_path / "output" / "poses" / "pose_001.pdb"
+    assert result.status == "succeeded"
+    assert result.selected_pose == "poses/pose_001.pdb"
+    _validate_pose_chain_contract(
+        pose,
+        expected_sequences={"C": "FGHI", "A": "ACDE"},
+        expected_residue_keys={
+            "C": [(1, "", "PHE"), (2, "", "GLY"), (3, "", "HIS"), (4, "", "ILE")],
+            "A": [(1, "", "ALA"), (2, "", "CYS"), (3, "", "ASP"), (4, "", "GLU")],
+        },
+    )
 
 
 def test_explicit_lightdock_cores_are_forwarded_and_recorded(tmp_path: Path) -> None:

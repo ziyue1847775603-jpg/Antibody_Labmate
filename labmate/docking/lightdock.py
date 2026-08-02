@@ -331,6 +331,31 @@ def _mark_duplicate_pose_groups(
     ]
 
 
+def _validate_pose_chain_contract(
+    path: Path,
+    *,
+    expected_sequences: dict[str, str],
+    expected_residue_keys: dict[str, list[tuple[int, str, str]]],
+) -> None:
+    """Validate exactly the chains supplied to this independent execution.
+
+    The legacy Live Local validator is intentionally fixed to paired A/H/L
+    input.  The modular executor also accepts a validated single-chain VHH,
+    whose LightDock pose therefore has antigen plus one ligand chain.  Its
+    safety contract remains exact chain, sequence, and residue-key equality;
+    only the legacy-specific chain-name assumption is removed here.
+    """
+    from labmate.live_local import _pdb_chain_contract
+
+    observed_sequences, observed_keys = _pdb_chain_contract(path)
+    if set(observed_sequences) != set(expected_sequences):
+        raise ValueError("LightDock pose chain set differs from validated inputs")
+    if observed_sequences != expected_sequences:
+        raise ValueError("LightDock pose chain sequences differ from validated inputs")
+    if observed_keys != expected_residue_keys:
+        raise ValueError("LightDock pose residue keys differ from validated inputs")
+
+
 class LocalLightDockExecutor:
     """Fail-closed LightDock 0.9.x executor, separate from Replay ranking."""
 
@@ -421,9 +446,9 @@ class LocalLightDockExecutor:
             encoding="utf-8",
         )
         exits["conformations"] = self._run([str(self.conformation_executable), receptor.name, ligand.name, selected.name, str(len(selected_rows))], cwd=work, timeout_seconds=timeout_seconds, logs=logs, name="conformations")
-        # Reuse the established Phase 2a exact chain/residue validator rather
-        # than accepting an arbitrary ATOM-bearing PDB as a successful pose.
-        from labmate.live_local import _pdb_chain_contract, _validate_lightdock_pose
+        # Reuse the established exact chain/residue parser rather than
+        # accepting an arbitrary ATOM-bearing PDB as a successful pose.
+        from labmate.live_local import _pdb_chain_contract
         receptor_sequences, receptor_keys = _pdb_chain_contract(receptor)
         ligand_sequences, ligand_keys = _pdb_chain_contract(ligand)
         pose_records: list[DockingPoseRecord] = []
@@ -490,7 +515,7 @@ class LocalLightDockExecutor:
             pose = poses / f"pose_{rank:03d}.pdb"
             shutil.copy2(generated, pose)
             try:
-                _validate_lightdock_pose(
+                _validate_pose_chain_contract(
                     pose,
                     expected_sequences={**receptor_sequences, **ligand_sequences},
                     expected_residue_keys={**receptor_keys, **ligand_keys},
