@@ -71,6 +71,20 @@ if "cdr_h_cdr1" not in st.session_state:
 st.title("Antibody Labmate — CDR-to-Docking Workflow")
 st.caption("网页仍是 Phase 1 Replay 演示：只重放精确匹配的合成 fixture；不会在网页中运行或模拟 IgCraft、ColabFold、LightDock 或远程 worker。六条 CDR 不能在此网页生成 framework 或完整 VH/VL；真实本地计算需要完整 VH/VL。")
 
+st.info(
+    """
+    🚀 **Live Local 已开放自托管部署**
+
+    具备本地 GPU 和所需外部工具环境的用户，可按照 GitHub 文档运行：
+
+    **RFantibody → ProteinMPNN → ColabFold（AlphaFold2-based）→ LightDock**
+
+    当前公开网页仍运行 Replay 演示，不在公共 Streamlit 服务执行实时计算。
+
+    [查看 GitHub 源码与部署说明](https://github.com/ziyue1847775603-jpg/Antibody_Labmate)
+    """
+)
+
 capabilities = capability_matrix()
 cap_cols = st.columns(4)
 with cap_cols[0]:
@@ -80,7 +94,7 @@ with cap_cols[0]:
     )
 with cap_cols[1]:
     st.markdown(
-        '<div class="cap-card cap-ok"><strong>Live Local</strong><br><code>verified_live</code><br>仅限本机 CLI；已用限定版本与离线 single-sequence 小规模配置完成端到端验证。</div>',
+        '<div class="cap-card cap-ok"><strong>Live Local</strong><br><code>verified_live</code><br>已开放本地 GPU / GPU 服务器自托管部署；公共 Streamlit 网页仍为 Replay-only。</div>',
         unsafe_allow_html=True,
     )
 with cap_cols[2]:
