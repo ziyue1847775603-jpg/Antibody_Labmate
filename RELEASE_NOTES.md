@@ -1,6 +1,113 @@
 # Release Notes
 
+## Unreleased — Pluggable Prediction Backends
+
+- Added a provider-neutral `PredictionBackend` / `PredictionResult` contract
+  and registry with `replay`, `colabfold`, and `igfold` providers.
+- Preserved the complete Replay workflow, strict fixture/input hash checks,
+  deterministic outputs, and existing ranking/reporting contracts.
+- Added prediction-only local wrappers for user-installed ColabFold and
+  IgFold environments. They do not download or bundle source, model weights,
+  databases, or third-party executables.
+- Added backend selection to the CLI and explanatory selection to Streamlit.
+  The web application remains Replay-only and never silently falls back from
+  a selected local engine to Replay.
+- Added a Python 3.11 Replay Docker deployment. The image deliberately excludes
+  ColabFold, IgFold, LightDock, model weights, databases, user uploads, and
+  runtime outputs.
+- Completed one real, host-side WSL2 ColabFold 1.6.2 prediction-only smoke
+  using a single VH/VL pair, preinstalled weights, one model, one recycle, and
+  no relaxation. It produced one non-empty two-chain PDB through the new
+  wrapper. This is software-integration evidence only; it is not scientific,
+  docking, benchmark, production, Docker-GPU, or remote-worker validation.
+- Hardened prediction output discovery against symbolic links and
+  out-of-directory PDBs, bounded stdout/stderr metadata while retaining
+  path-redacted logs, surfaced recovered GPU allocation warnings, and changed
+  concrete backend package exports to lazy loading to prevent fresh-process
+  workflow import cycles.
+- Completed one real local IgFold 0.4.0 prediction-only smoke through an
+  explicit external-interpreter bridge: the Python 3.11 Labmate process
+  invoked an isolated Python 3.10 legacy worker, which produced a non-empty
+  H/L-chain PDB with exact input-sequence preservation. This is bounded local
+  software-integration evidence only; it is not scientific, docking,
+  benchmark, production, Docker-GPU, or remote-worker validation.
+- Added a Python-3.10-compatible IgFold worker and an explicit
+  `--igfold-python` option. The bridge uses a fixed worker script, JSON files
+  under a new controlled output directory, argument-list subprocess calls with
+  `shell=False`, minimal secret-free environment, a 30-minute timeout,
+  path/token-redacted bounded logs, and fail-closed response/PDB validation.
+  It fixes one model, disables refinement/renumbering, rejects symlinks,
+  stale/out-of-directory/invalid-chain PDBs, and preserves exact H/L sequences.
+  IgFold native `prmsd` remains backend-native and unscaled; no generic
+  confidence or docking/affinity metric is fabricated.
+
 ## v0.3.0 — Benchmark Local (2026-07-28)
+
+### Local docking execution adapter
+
+- Added an explicit, local-only LightDock execution handoff for validated
+  `DockingInput` JSON. It runs the user-supplied 0.9.x setup, sampling and
+  conformation executables with bounded subprocesses and run-relative
+  provenance. It remains separate from Replay ranking and prediction-native
+  metrics.
+- One minimal public-fixture LightDock 0.9.4 engineering smoke completed with
+  an IgFold prediction artifact as ligand. This verifies software integration,
+  not pose correctness, affinity, epitope, DB5.5 performance, or experiments.
+
+### Benchmark metrics and cross-swarm provenance
+
+- Added a separate `capri_dockq_2016_v1` implementation of Fnat, interface
+  RMSD and ligand RMSD plus the traditional CAPRI four-category criteria.
+  The legacy `compute_reference_metrics` implementation and all existing
+  Replay/Live Local ranking behavior remain unchanged.
+- Cross-validated Fnat/I-RMSD/L-RMSD against official DockQ v2.1.3
+  (`d9cbb1940bb0f42db3257f7da3b0e96f162b94d9`) on five synthetic cases and
+  its official 1A2K example. This validates implementation agreement only; it
+  is not a public scientific benchmark.
+- Extended the independent LightDock executor to collect all current-run
+  `swarm_<id>` outputs and derive `global_tool_score_rank` from one native
+  scoring function with deterministic swarm/row tie breaks. LightDock does
+  not supply this cross-swarm global rank, and Labmate does not describe it as
+  one. Failed and duplicate poses retain their original derived rank.
+- Added a frozen benchmark run configuration and tool-ranked top-1/top-5/
+  top-10 aggregation with a separately labelled reference-selected oracle.
+  No DB5.5 data or public benchmark result is bundled.
+- Ran and froze one 1AHW local docking engineering pilot with 10 swarms and
+  10 validated tool-ranked poses after an earlier bounded timeout. Its rank-1
+  Labmate grouped CAPRI result was `incorrect`. DockQ v2.1.3 pairwise outputs
+  are retained only as diagnostics: its chain-group conversion changes the
+  receptor/ligand semantic L-RMSD for this conventional H/L case. Therefore no
+  rank-2–10 evaluation, top-k result, oracle, benchmark success rate, affinity,
+  or general-performance claim is emitted.
+
+### RFantibody sequence-design workflow
+
+- Added a local-only external-interpreter bridge for the official RFantibody
+  VHH sequence workflow. It retains RFdiffusion output only as a
+  `backbone_generated` intermediate and requires official ProteinMPNN output,
+  sequence threading, exact FASTA/PDB agreement, finite-coordinate checks and
+  fixed-framework backbone validation before a candidate is prediction-ready.
+- The bridge records RFdiffusion and ProteinMPNN checkpoint provenance,
+  controlled candidate FASTA/PDB paths and unscaled ProteinMPNN negative
+  log-likelihood. It does not create affinity, binder, therapeutic, unified
+  quality, or cross-stage scores.
+- RFantibody and ProteinMPNN remain external user-managed software; no source,
+  environment, checkpoint, cache, or generated candidate is distributed.
+- Completed one local VHH engineering handoff from a sequence-validated
+  RFantibody/ProteinMPNN candidate through offline ColabFold and independent
+  LightDock execution. The resulting ten tool-ranked poses verify engineering
+  provenance and output validation only; no binder, affinity, epitope, or
+  experimental-validation claim is made.
+
+### Input-contract hardening (uncommitted branch)
+
+- Clarified that six CDR strings are only a fixed Replay demonstration input;
+  they do not generate complete VH/VL during local computation.
+- Live Local requires complete VH/VL FASTA plus region annotations and antigen;
+  the modular path requires complete VH/VL or a validated PredictionArtifact.
+- IgCraft was audited but not integrated because its available grafting API
+  requires a complete antibody PDB rather than six CDR strings. No reference
+  framework or substitute generator is used to bridge that mismatch.
 
 - Replay remains the stable hash-exact synthetic demonstration mode.
 - Live Local remains the previously validated one-candidate synthetic WSL2

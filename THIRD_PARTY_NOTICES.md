@@ -24,7 +24,9 @@ Streamlit installs transitive dependencies listed in `requirements.lock`. They a
 |---|---|---|---|
 | IgCraft | MIT for code/official weights page at route audit time | Not installed or run; fixture is not IgCraft output | Not run by the application |
 | ColabFold | MIT for code; AlphaFold model/data dependencies require separate review | Not run; fixture metrics are synthetic | External ColabFold 1.6.2 executed with preinstalled `alphafold2_multimer_v3` weights and `single_sequence`; not bundled |
+| IgFold / AntiBERTy | JHU Academic Software License; non-commercial use terms apply to the official code, data, and weights | Not installed or run by Replay | A separate user-managed legacy Python environment completed one prediction-only VH/VL software-integration smoke; no environment, package, checkpoint, cache, or output is bundled |
 | LightDock | GPL-3.0 | `LightDockProvider` remains `replay_only`; no execution | External LightDock 0.9.4 executed through CLI/file interfaces; no source, binary, environment, or GPL output is included in the source ZIP. Benchmark Local also requires a separate user installation and remains `implemented_unverified`. |
+| RFantibody / ProteinMPNN | MIT for the audited RFantibody code route; exact upstream model/data terms require user review | Not run | External user-managed RFantibody 1.0.0 and its official ProteinMPNN stage may be invoked only through the local CLI; code, checkpoints, environments, caches and generated candidates are not bundled. |
 | ElliDock | MIT at route audit time | Not implemented or run | Not implemented or run |
 | HDOCKlite | Academic/non-commercial with redistribution restrictions noted by route | Not included | Not used or implemented |
 | Schrödinger | Proprietary | Not included | Not used or implemented |
@@ -36,6 +38,12 @@ separate user installation for this MIT source distribution. If a distributor
 instead includes it in a container or installer, that distributor must
 separately satisfy GPL-3.0 license, notice, and corresponding-source
 obligations. This project notice does not provide legal advice.
+
+IgFold and AntiBERTy are also external, user-installed tools. Their official
+packages display JHU Academic Software License terms that restrict use to
+non-commercial purposes (including use at commercial entities). Antibody
+Labmate does not redistribute their code, environment, weights, cache, or
+generated output; users must review and satisfy the upstream terms themselves.
 
 Schrödinger/PIPER is permitted only as a user-run external commercial
 comparison under that user's license. Antibody Labmate does not call or bundle

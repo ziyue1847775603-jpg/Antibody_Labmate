@@ -1,0 +1,74 @@
+# Docker
+
+The repository image is a reproducible Python 3.11 environment for the
+hash-verified Replay demo. It does not contain ColabFold, IgFold, LightDock,
+model weights, sequence databases, or other scientific executables.
+
+## Replay mode
+
+Replay does not require a GPU. From the repository root:
+
+```bash
+docker compose up --build
+```
+
+Open <http://localhost:8501>. Runtime artifacts are written to the ignored
+repository-relative `runs/` directory. Stop the service with:
+
+```bash
+docker compose down
+```
+
+The CLI can also be invoked in the built image:
+
+```bash
+docker compose run --rm labmate \
+  python -m labmate.cli run fixtures/demo_001/project.yaml \
+  --mode replay \
+  --prediction-backend replay \
+  --fixture demo_001
+```
+
+## Local prediction and docking
+
+The base image intentionally supports Replay only. ColabFold, IgFold, and
+LightDock remain user-installed external tools and are not downloaded during
+the image build.
+
+The recorded 2026-07-29 ColabFold and isolated-interpreter IgFold
+prediction-backend smokes ran directly in the host WSL2 environment, not in
+this image. Docker GPU prediction remains
+unverified.
+
+A custom live-compute image or host installation must separately provide:
+
+- a compatible NVIDIA GPU and driver;
+- NVIDIA Container Toolkit when GPU execution happens in Docker;
+- the selected prediction package and executable;
+- locally installed model weights and databases;
+- LightDock when running a docking workflow; and
+- all applicable licenses and input-data rights.
+
+Mounting those resources or creating a derivative image does not make a result
+scientifically validated. The recorded synthetic integrations are software
+integration checks only; they are not affinity, free-energy, specificity,
+safety, efficacy, or experimental validation.
+
+## Replay container validation
+
+On 2026-07-29 the Replay image was built from this working tree with Docker
+Engine 29.6.2. The transmitted build context was approximately 1.77 MB; the
+ignored host `runs/`, conda environments, model data, caches, and external
+scientific tools were not sent. The resulting image:
+
+- started Streamlit as the non-root `labmate` user;
+- returned HTTP 200 / `ok` from the Streamlit health endpoint;
+- retained the `REPLAY · FIXED HASH-VERIFIED DEMO · NOT LIVE COMPUTE` UI
+  boundary;
+- contained neither `colabfold_batch` nor `lightdock3.py`; and
+- completed the hash-exact Replay CLI workflow using container-temporary
+  output.
+
+The container and compose network were then stopped and removed. This verifies
+the Replay container path only. GPU passthrough, ColabFold, IgFold, LightDock,
+and any live-compute Docker configuration remain unverified.

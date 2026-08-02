@@ -5,15 +5,28 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from labmate.backends.base import ComputeBackend
+from labmate.backends.base import (
+    ComputeBackend,
+    PredictionBackend,
+    PredictionResult,
+    normalize_prediction_sequence,
+)
 from labmate.errors import FixtureIntegrityError
 from labmate.models import Capability, CapabilityStatus, JobSpec, RunResult
 from labmate.provenance import build_input_hashes, sha256_file, verify_artifact_hashes
 
 
-class ReplayBackend(ComputeBackend):
-    def __init__(self, fixture_root: Path) -> None:
+class ReplayBackend(ComputeBackend, PredictionBackend):
+    name = "replay"
+
+    def __init__(
+        self,
+        fixture_root: Path,
+        *,
+        prediction_backend: PredictionBackend | None = None,
+    ) -> None:
         self.fixture_root = fixture_root.resolve()
+        self.prediction_backend = prediction_backend or self
         self._results: dict[str, RunResult] = {}
         self._statuses: dict[str, str] = {}
 
@@ -87,6 +100,7 @@ class ReplayBackend(ComputeBackend):
             antigen_bytes=antigen_bytes,
             fixture_root=self.fixture_root,
             output_root=output_root,
+            prediction_backend=self.prediction_backend,
         )
         self._results[result.run_id] = result
         self._statuses[result.run_id] = "succeeded"
@@ -105,7 +119,87 @@ class ReplayBackend(ComputeBackend):
         except KeyError as exc:
             raise FixtureIntegrityError(f"未知或未完成的 Replay job: {job_id}") from exc
 
+    def predict(
+        self,
+        heavy_chain: str,
+        light_chain: str | None,
+        antigen_pdb: Path | None = None,
+        output_dir: Path | None = None,
+    ) -> PredictionResult:
+        """Return the exact matching hash-verified fixture structure.
+
+        This stage-level method does not weaken the full Replay input gate:
+        ``submit`` still verifies the complete CDR/antigen bundle before any
+        workflow output is created.
+        """
+
+        del antigen_pdb
+        heavy = normalize_prediction_sequence(heavy_chain, label="heavy_chain")
+        light = normalize_prediction_sequence(light_chain, label="light_chain")
+        fixture_manifest = self._load_manifest()
+        matches: list[tuple[str, Path]] = []
+        structures_root = self.fixture_root / "colabfold_output"
+        for candidate_dir in sorted(structures_root.glob("CAND-*")):
+            sequence_map_path = candidate_dir / "sequence_map.json"
+            pdb_path = candidate_dir / "ranked_1.pdb"
+            if not sequence_map_path.is_file() or not pdb_path.is_file():
+                continue
+            try:
+                sequence_map = json.loads(
+                    sequence_map_path.read_text(encoding="utf-8")
+                )
+            except json.JSONDecodeError as exc:
+                raise FixtureIntegrityError(
+                    f"Invalid Replay sequence map: {sequence_map_path.name}"
+                ) from exc
+            chains = sequence_map.get("chains", {})
+            if not isinstance(chains, dict):
+                continue
+            heavy_row = chains.get("H")
+            light_row = chains.get("L")
+            if not isinstance(heavy_row, dict):
+                continue
+            if heavy_row.get("sequence") != heavy:
+                continue
+            if light is None:
+                if light_row is not None:
+                    continue
+            elif not isinstance(light_row, dict) or light_row.get("sequence") != light:
+                continue
+            matches.append((candidate_dir.name, pdb_path))
+
+        if len(matches) != 1:
+            raise FixtureIntegrityError(
+                "Replay prediction requires one exact fixture VH/VL sequence match"
+            )
+
+        candidate_id, source_pdb = matches[0]
+        result_pdb = source_pdb
+        if output_dir is not None:
+            output_dir = output_dir.resolve()
+            output_dir.mkdir(parents=True, exist_ok=True)
+            result_pdb = output_dir / "ranked_1.pdb"
+            if result_pdb.exists():
+                raise FixtureIntegrityError(
+                    "Replay prediction output already exists: ranked_1.pdb"
+                )
+            result_pdb.write_bytes(source_pdb.read_bytes())
+
+        return PredictionResult(
+            pdb_path=result_pdb,
+            backend_name=self.name,
+            status="succeeded",
+            metadata={
+                "fixture_id": fixture_manifest["fixture_id"],
+                "candidate_id": candidate_id,
+                "execution_kind": "replay",
+                "hash_verified": True,
+            },
+            warnings=[
+                "Deterministic offline fixture replay; no prediction engine executed."
+            ],
+        )
+
     @property
     def fixture_manifest_hash(self) -> str:
         return sha256_file(self.fixture_root / "fixture_manifest.json")
-

@@ -1,6 +1,5 @@
 """Replay-safe docking contracts."""
 
-from .lightdock import LightDockProvider, ParsedDockingPose
+from .lightdock import DockingExecutionResult, DockingPoseRecord, LightDockProvider, LocalLightDockExecutor, ParsedDockingPose
 
-__all__ = ["LightDockProvider", "ParsedDockingPose"]
-
+__all__ = ["DockingExecutionResult", "DockingPoseRecord", "LightDockProvider", "LocalLightDockExecutor", "ParsedDockingPose"]

@@ -20,6 +20,20 @@ ROOT = Path(__file__).resolve().parent
 FIXTURE_ROOT = ROOT / "fixtures" / "demo_001"
 PROJECT_FILE = FIXTURE_ROOT / "project.yaml"
 RUNS_ROOT = ROOT / "runs"
+PREDICTION_BACKEND_OPTIONS = {
+    "replay": (
+        "Replay (Demo)",
+        "Deterministic offline demonstration",
+    ),
+    "colabfold": (
+        "ColabFold",
+        "AlphaFold2 based local prediction",
+    ),
+    "igfold": (
+        "IgFold",
+        "Local paired VH/VL prediction-only; unavailable on this Replay web host",
+    ),
+}
 
 
 def read_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -55,7 +69,7 @@ if "cdr_h_cdr1" not in st.session_state:
     reset_demo(demo_job)
 
 st.title("Antibody Labmate — CDR-to-Docking Workflow")
-st.caption("网页仍是 Phase 1 Replay 演示：只重放精确匹配的合成 fixture；不会在网页中运行或模拟 IgCraft、ColabFold、LightDock 或远程 worker。")
+st.caption("网页仍是 Phase 1 Replay 演示：只重放精确匹配的合成 fixture；不会在网页中运行或模拟 IgCraft、ColabFold、LightDock 或远程 worker。六条 CDR 不能在此网页生成 framework 或完整 VH/VL；真实本地计算需要完整 VH/VL。")
 
 capabilities = capability_matrix()
 cap_cols = st.columns(4)
@@ -98,7 +112,7 @@ with new_run_tab:
             l_cdr1 = st.text_input("L-CDR1", key="cdr_l_cdr1")
             l_cdr2 = st.text_input("L-CDR2", key="cdr_l_cdr2")
             l_cdr3 = st.text_input("L-CDR3", key="cdr_l_cdr3")
-        st.info("可编辑字段用于演示校验失败行为。任何规范化后哈希不同的 CDR 都会被 ReplayBackend 拒绝，不会套用 demo 结果。")
+        st.info("六条 CDR 仅用于固定 Replay 演示，不会生成 framework 或完整 VH/VL。可编辑字段用于演示校验失败行为；任何规范化后哈希不同的 CDR 都会被 ReplayBackend 拒绝，不会套用 demo 结果。")
 
     with right:
         st.subheader("抗原 PDB")
@@ -122,6 +136,18 @@ with new_run_tab:
         except LabmateError as exc:
             st.error(str(exc))
         st.text_input("Mode", value="REPLAY", disabled=True)
+        prediction_backend_name = st.selectbox(
+            "Structure prediction backend",
+            options=tuple(PREDICTION_BACKEND_OPTIONS),
+            index=0,
+            format_func=lambda name: PREDICTION_BACKEND_OPTIONS[name][0],
+        )
+        st.caption(PREDICTION_BACKEND_OPTIONS[prediction_backend_name][1])
+        if prediction_backend_name != "replay":
+            st.warning(
+                "This engine is exposed by the local prediction CLI. "
+                "The web workflow remains the hash-verified Replay demo."
+            )
         st.text_input("DockingProvider", value="LightDockProvider · replay_only", disabled=True)
         st.number_input("Candidate count", value=4, disabled=True)
         st.number_input("Random seed", value=42, disabled=True)
@@ -130,7 +156,11 @@ with new_run_tab:
         "我确认本次加载的是项目自建 CC0 合成 demo，并理解输出不是实验结合、亲和力、疗效或安全性结论。",
         value=True,
     )
-    if st.button("Run verified REPLAY", type="primary", disabled=not rights_confirmed):
+    if st.button(
+        "Run verified REPLAY",
+        type="primary",
+        disabled=not rights_confirmed or prediction_backend_name != "replay",
+    ):
         payload = demo_job.model_dump(mode="json")
         payload["antibody"].update(
             {

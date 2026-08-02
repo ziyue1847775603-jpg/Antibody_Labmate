@@ -1,12 +1,106 @@
 # Antibody Labmate — CDR-to-Docking Workflow
 
+> **Input boundary:** six CDR strings are accepted only by the fixed,
+> hash-verified Replay demonstration. They do not generate a framework or
+> complete VH/VL locally. Real local computation requires complete paired VH/VL
+> sequences or a locally validated PredictionArtifact.
+
+> **Public scientific benchmark:** one frozen 1AHW engineering pilot completed
+> local docking only. It does not establish a top-k result, general benchmark
+> performance, docking accuracy, affinity, or experimental validity.
+
+> **Benchmark metrics:** versioned CAPRI Fnat/I-RMSD/L-RMSD and traditional
+> quality categories are implemented separately from legacy metrics. The
+> implementation agrees with official DockQ v2.1.3 on five synthetic cases and
+> the official 1A2K example within strict numerical tolerances. For conventional
+> H/L antibody groups, DockQ v2.1.3 remains pairwise diagnostic only: it cannot
+> provide Labmate's antigen-versus-H/L-group semantic L-RMSD. Cross-swarm
+> multi-pose ordering is a Labmate-derived `global_tool_score_rank`, not a
+> LightDock-native global rank. See [`docs/benchmark_pilot_1ahw.md`](docs/benchmark_pilot_1ahw.md).
+
 > **v0.3.0 · REPLAY + VERIFIED LIVE LOCAL + IMPLEMENTED-UNVERIFIED BENCHMARK LOCAL · NO LIVE REMOTE**
 
 本版本保留 Phase 1 Replay MVP，并新增 Phase 2a Live Local CLI。Replay 接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行固定产物重放。运行时会重新完成 PDB 解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。
 
-Streamlit 页面仍只展示 Replay。CLI 另提供 `verified_live` 的 Live Local 路径：它调用用户自行安装的 ColabFold 与 LightDock；不会下载、捆绑或模拟这两个工具。该状态只覆盖 [`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md) 记录的本机小规模配置，不代表其他版本、参数或科学有效性。Live Remote 仍为 `unavailable`。
+Streamlit 页面提供结构预测后端选择说明，但为了不把固定结果套用到新输入，网页仍只执行 Replay。CLI 另提供 `verified_live` 的 Live Local 路径：它调用用户自行安装的 ColabFold 与 LightDock；不会下载、捆绑或模拟这两个工具。该状态只覆盖 [`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md) 记录的本机小规模配置，不代表其他版本、参数或科学有效性。Live Remote 仍为 `unavailable`。
 
 CLI 还提供 Phase 2b `benchmark_local`：本地抗体 PDB 与抗原 PDB 直接进入用户独立安装的 LightDock，可选用天然复合物计算 RMSD、Fnat 和界面 precision/recall/F1。它跳过 ColabFold、不接受 FASTA、不联网。当前已完成代码测试与一次真实 LightDock 0.9.4 CC0 synthetic 软件集成 smoke，但尚未完成 DB5.5 科学 benchmark，状态固定为 `implemented_unverified`；详见 [`BENCHMARK_LOCAL.md`](BENCHMARK_LOCAL.md) 和 [`BENCHMARK_LOCAL_VALIDATION.md`](BENCHMARK_LOCAL_VALIDATION.md)。
+
+## Prediction Backends
+
+结构预测现在通过统一的 `PredictionBackend` 接口返回
+`PredictionResult`，下游只读取 PDB 路径、后端名称、状态、元数据和警告。
+可用 registry 名称为 `replay`、`colabfold` 和 `igfold`；未知名称会明确报错。
+
+- **Replay (Demo)**：默认后端。完全离线、确定性，只接受与
+  `fixtures/demo_001` 精确匹配的合成 VH/VL，并保留原有 fixture
+  SHA-256 验证。完整 Replay workflow 与既有输出保持兼容。
+- **ColabFold**：AlphaFold2-based 本机 wrapper。只调用用户安装的
+  `colabfold_batch`，使用本机预装模型数据和 `single_sequence` 模式；
+  不捆绑源码、数据库或权重，也不联系公共 MSA 服务。默认使用一个
+  model、一个 recycle、零 relaxation 和 `compile-mode=fast`，适合受控的
+  prediction-only smoke，不代表生产质量参数。
+- **IgFold**：抗体专用的本机 prediction-only wrapper，要求成对的完整
+  VH/VL。wrapper 固定关闭 Rosetta refinement 和 renumbering，使用空的
+  独立输出目录并严格复核 H/L 链序列。IgFold 0.4.0 可通过明确指定的、
+  用户自管的外部 Python interpreter 运行；项目不会捆绑 IgFold、环境或
+  权重，且不会静默回退到 Replay。其 JHU Academic Software License
+  含非商业使用条款，用户必须自行确认适用性。
+
+预测阶段可以独立运行；当前外部预测插件不会被错误接到固定 Replay
+docking 产物上。既有完整真实计算路径仍是经过限定配置验证的
+`live_local`，Benchmark Local 则直接接收现成 PDB。
+
+Prediction-only PDB 可先经严格的后端无关 `PredictionArtifact` / `DockingInput`
+adapter 验证，再交给未来的本机 docking adapter。该层已对既有 ColabFold 与
+IgFold synthetic PDB 做 dry handoff；它不运行 docking、不统一 confidence，也不
+改变 Replay 或现有 ColabFold-only Live Local ranking。详见
+[`docs/prediction_docking_adapter.md`](docs/prediction_docking_adapter.md)。
+
+```bash
+# Replay：完整、哈希严格匹配的 demo workflow
+labmate run fixtures/demo_001/project.yaml \
+  --mode replay \
+  --prediction-backend replay \
+  --fixture demo_001
+
+# ColabFold：本机离线预测阶段
+labmate predict \
+  --prediction-backend colabfold \
+  --heavy-chain "FULL_VH_SEQUENCE" \
+  --light-chain "FULL_VL_SEQUENCE" \
+  --colabfold-model-data "$COLABFOLD_DATA_DIR" \
+  --output runs/colabfold_prediction
+
+# IgFold：本机抗体结构预测阶段
+labmate predict \
+  --prediction-backend igfold \
+  --igfold-python "$IGFOLD_PYTHON" \
+  --heavy-chain-file input/vh.txt \
+  --light-chain-file input/vl.txt \
+  --output runs/igfold_prediction
+```
+
+`python -m labmate.run` 提供相同的 prediction-only 参数入口。Docker
+镜像固定为无需 GPU 的 Replay 环境；运行 `docker compose up --build`
+即可启动 Streamlit。Live/GPU 环境所需的 NVIDIA Container Toolkit、
+外部数据库、权重与科学工具不进入镜像，详见
+[`docs/docker.md`](docs/docker.md)。
+
+2026-07-29 已在宿主 WSL2 环境用真实 ColabFold 1.6.2 和预装权重运行
+一个 VH/VL prediction-only smoke：wrapper 生成正确的 `VH:VL` 两链
+FASTA，GPU 计算完成并生成唯一、非空、A/B 两链的 rank-1 PDB。该记录只
+证明本机软件集成可以运行；不证明抗体结构准确性、docking、DB5.5
+benchmark、亲和力或实验结果。完整命令、PDB SHA-256、显存采样和限制见
+[`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md#colabfold-prediction-backend-smoke-test)。
+
+同日还完成一次真实 IgFold 0.4.0 **external-interpreter** prediction-only
+smoke：Python 3.11 的 Labmate CLI 调用隔离的 Python 3.10 worker，使用一对
+VH/VL 生成非空 H/L 两链 PDB，并通过严格的逐链序列校验。该 legacy 环境为
+CPU-only；它只证明这个本机软件集成、worker 协议和输出发现可以运行，
+不证明结构准确性、docking、DB5.5 benchmark、亲和力或实验结果。此前
+Python 3.11/Transformers 5 组合的失败也保留在验证记录中。详见
+[`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md#igfold-prediction-backend-smoke-test)。
 
 ## Benchmark Local（真实 synthetic 集成已运行、科学未验证）
 
@@ -21,6 +115,10 @@ labmate run project.json --mode benchmark_local
 ## Live Local（已验证限定配置、CLI-only）
 
 Live Local 接受完整 VH/VL 候选 FASTA、精确的 region CSV 和一个单链抗原 PDB。它依次调用本机 ColabFold、LightDock，再执行几何界面分析、候选排名和 HTML 报告。所有外部命令输出写入 run 日志；成功完成全部校验后，报告与 manifest 标记为 `LIVE LOCAL · VERIFIED LIVE`。
+
+region CSV 仅标注完整序列的区域，供校验、分析和既有 ranking 使用；它不补全 framework，六条 CDR 不能替代完整 VH/VL。模块化本地路径同样要求完整 VH/VL 或已验证 `PredictionArtifact`，随后可产生 `DockingInput` 和独立 LightDock pose/manifest；不提供 CDR-only sequence generation 或跨后端统一 ranking。能力矩阵与完整输入契约见 [`docs/input_contracts.md`](docs/input_contracts.md)。
+
+IgCraft 已审计但未集成：可用本地版本的 grafting 接口要求完整抗体 PDB，而非六条 CDR 字符串。项目不会使用参考 VH/VL、固定 framework 或其他模型冒充 CDR-to-sequence generation。详见 [`docs/igcraft_evaluation.md`](docs/igcraft_evaluation.md)。
 
 开始前请单独安装并确认本机可运行 `colabfold_batch`、`lightdock3_setup.py`、`lightdock3.py`、`lgd_generate_conformations.py`。工具不会由本项目安装。配置会 fail closed：必须显式指定 MSA 模式、预装模型目录和 `alphafold2_multimer_v3`；模板使用不联系公共 MSA 服务的 `single_sequence`。复制 [`examples/live_local`](examples/live_local) 到仓库外并填写有权处理的输入后：
 
@@ -157,7 +255,12 @@ antibody-labmate/
 │   ├── state.py
 │   ├── workflow.py
 │   ├── validators/
-│   ├── backends/replay.py
+│   ├── backends/
+│   │   ├── base.py
+│   │   ├── registry.py
+│   │   ├── replay.py
+│   │   ├── colabfold.py
+│   │   └── igfold.py
 │   ├── docking/lightdock.py
 │   ├── analysis/
 │   └── reporting/
@@ -165,6 +268,9 @@ antibody-labmate/
 ├── .streamlit/config.toml
 ├── scripts/build_demo_fixture.py
 ├── tests/
+├── Dockerfile
+├── docker-compose.yml
+├── docs/docker.md
 ├── DEPLOYMENT.md
 ├── RELEASE_NOTES.md
 ├── DEMO_SCRIPT.md
@@ -204,6 +310,7 @@ RUN_ID/
 - LightDockProvider：默认 docking provider 契约，`replay_only`。只实现固定 CSV/PDB schema 解析；调用 `dock()` 会抛出明确错误。
 - Live Local：`verified_live`，仅本机 CLI；验证范围为 ColabFold 1.6.2、离线 `single_sequence`、预装 multimer-v3 权重、外部 LightDock 0.9.4 和一候选小规模 smoke 参数。其他版本、MSA-backed 模式、评分函数、规模和科学有效性不在该状态范围内。
 - Benchmark Local：`implemented_unverified`，本地 PDB→外部 LightDock→界面与可选 reference 指标已实现，并完成一次记录在案的真实 LightDock 0.9.4 synthetic 软件集成 smoke；尚未完成 DB5.5 科学 benchmark。
+- Public benchmark framework：data contract、`capri_dockq_2016_v1` metrics、传统 CAPRI category 与跨 swarm multi-pose provenance 已通过 synthetic/official-DockQ 实现验证；公开 DB5.5 pilot 尚未运行，因此没有公开 top-k 科学结果。
 - Live Remote：`unavailable`。
 - ElliDockProvider/HDOCKProvider：Phase 1 不创建虚假 skeleton，也不出现在可运行选择框。
 - 普通 DiffDock：不属于蛋白–蛋白 docking 后端。
@@ -242,6 +349,36 @@ python -m scripts.package_project
 本项目由 Codex 根据用户提供的路线和明确产品决策协助实现，包括 Phase 1 Replay 及 Phase 2a Live Local 的数据模型、状态机、校验器、适配器、分析/排名、报告、UI 与测试。项目负责人仍需对科学措辞、输入权利、展示和最终发布负责；Git、README、Devpost 与视频中的贡献描述应与事实一致。
 
 ## 当前未验证部分
+
+### Independent local docking execution
+
+The `labmate dock` command accepts a hash-validated `DockingInput` and explicit
+user-installed LightDock executable paths. It is separate from Replay ranking
+and never combines ColabFold or IgFold native metrics with docking scores. One
+minimal local LightDock 0.9.4 fixture smoke has completed using an IgFold H/L
+artifact as ligand and the public synthetic antigen fixture as receptor. This
+only verifies command construction, GSO-to-pose selection and pose discovery;
+a LightDock native score is not affinity and the smoke is not scientific,
+epitope, binding or experimental validation. See
+[docking execution details](docs/docking_execution.md).
+
+### RFantibody VHH sequence design
+
+The local-only `labmate design` command has a verified RFantibody VHH route
+that separates an RFdiffusion backbone intermediate from a final
+sequence-validated ProteinMPNN candidate. Only an exact FASTA/threaded-PDB
+match with complete provenance is prediction-ready. Generation order is not a
+quality rank, and the ProteinMPNN native negative log-likelihood is not
+affinity or a cross-stage score. See [the RFantibody integration
+boundary](docs/rfantibody_integration.md) and [the DesignArtifact
+contract](docs/design_artifact_contract.md). The web demo and Docker image do
+not run RFantibody or ProteinMPNN.
+
+One local engineering smoke has carried a sequence-validated VHH through
+offline ColabFold into the independent LightDock executor and produced ten
+validated tool-ranked poses. This verifies only the artifact handoff and
+provenance contracts; it is not binding, affinity, epitope, or experimental
+validation.
 
 - 应用内 IgCraft 执行与模型验证；
 - ColabFold 公共或本地 MSA-backed 模式、模板模式、其他版本/模型、批量规模与性能；

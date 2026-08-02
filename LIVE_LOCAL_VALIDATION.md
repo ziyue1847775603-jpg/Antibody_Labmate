@@ -208,9 +208,190 @@ Final run ID: **`RUN-20260727-004729-3afe82ca`**
 - Streamlit headless startup: health endpoint returned HTTP 200 / `ok`; the
   process was then stopped.
 
+## ColabFold Prediction Backend Smoke Test
+
+- Date: 2026-07-29
+- Operating system: WSL2, Ubuntu 26.04
+- GPU: NVIDIA GeForce RTX 5070 Ti Laptop GPU, 12,227 MiB
+- Backend: `ColabFoldBackend` (`prediction-only`)
+- ColabFold: 1.6.2 (`alphafold-colabfold` 2.3.18)
+- Environment Python: 3.11.15
+- Input type: one complete VH/VL pair, encoded as a two-chain
+  `VH:VL` ColabFold multimer FASTA
+- Output root: `$PROJECT_ROOT/runs/validation/`
+
+The project CLI invoked the real external executable through
+`python -m labmate.run`; no mock, Replay fixture, antigen, or docking stage was
+used. Machine-specific prefixes are normalized below:
+
+```bash
+$PROJECT_ROOT/.venv311/bin/python -m labmate.run \
+  --prediction-backend colabfold \
+  --heavy-chain "<complete VH>" \
+  --light-chain "<complete VL>" \
+  --colabfold-executable "$COLABFOLD_ROOT/bin/colabfold_batch" \
+  --colabfold-model-data "$COLABFOLD_MODEL_ROOT" \
+  --output "$PROJECT_ROOT/runs/validation/colabfold_backend_smoke_20260729_1625"
+```
+
+Parameters were `single_sequence`, preinstalled model data,
+`alphafold2_multimer_v3`, one model, one recycle, zero relaxation, random seed
+0, unified-memory disabled, and `compile-mode=fast`. The installed help
+confirmed every option. Although ColabFold's generated `config.json` retains
+an unused default `host_url`, the recorded mode is `single_sequence`, the A3M
+contains only the two supplied chains, and no MSA query stage appears in the
+execution log.
+
+Observed execution:
+
+- Start: 2026-07-29 16:25:09 +08:00
+- ColabFold completion: 2026-07-29 16:27:29 +08:00
+- Exit code: 0
+- GPU execution was reported by ColabFold and independently observed with
+  `nvidia-smi`.
+- Three read-only samples observed approximately 5,453–5,685 MiB GPU memory;
+  these samples are not a measured peak.
+- JAX initially logged several failed large-memory allocation attempts before
+  falling back and completing. The PDB was produced successfully. Post-run
+  hardening makes future `PredictionResult` objects surface this condition as
+  a non-fatal warning.
+
+Result validation:
+
+- `backend_name`: `colabfold`
+- `status`: `succeeded`
+- `return_code`: 0
+- Original run `warnings`: empty; the allocation-warning surfacing fix was
+  added after inspecting this run and regression-tested without repeating the
+  scientific computation.
+- Output PDB:
+  `colabfold/antibody_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000.pdb`
+- Output PDB size: 149,202 bytes
+- Output PDB SHA-256:
+  `a00efa82242ab3d5fb80bbdf1949b113cf8e46a432333f7e95a759f9f2371fe6`
+- The PDB contains 1,837 `ATOM`/`HETATM` rows and exactly chains A/B.
+- Independently parsed chain A exactly matches the 125-residue VH; chain B
+  exactly matches the 117-residue VL.
+- The canonical PDB path remains inside the requested output directory.
+- Output discovery found exactly one rank-1 PDB and no symbolic links.
+- The input FASTA SHA-256 is
+  `4d803605c11f3b8edd617fd2da6fcab0be30250d011f36a898c30b1e0f7cc751`.
+- Score JSON, predicted-aligned-error JSON, A3M, plots, config, citation,
+  stdout log, and stderr log were also produced. Logs were path-redacted and
+  kept outside the source/release scope under ignored `runs/`.
+
+This is a **local ColabFold prediction backend software-integration smoke
+test**. It verifies one wrapper invocation, GPU use, two-chain FASTA handling,
+bounded output discovery, and production of a non-empty PDB. It is not a
+DB5.5 scientific benchmark, docking validation, accuracy proof, production
+readiness statement, affinity/free-energy result, or experimental validation.
+
+## IgFold Prediction Backend Smoke Test
+
+- Date: 2026-07-29
+- Operating system: WSL2, Ubuntu 26.04
+- GPU: NVIDIA GeForce RTX 5070 Ti Laptop GPU, 12,227 MiB
+- Backend: `IgFoldBackend` (`prediction-only`)
+- Status: **succeeded — bounded local software-integration smoke**
+- IgFold: official PyPI release 0.4.0
+- AntiBERTy: official PyPI release 0.1.3
+- Environment: separate `antibody-labmate-igfold-legacy` conda environment
+- Main-process Python: 3.11.15; worker Python: 3.10.20
+- PyTorch: 1.13.1+cpu; CUDA runtime: none; `torch.cuda.is_available()`: `False`
+- Transformers: 4.24.0; AntiBERTy: 0.1.3; Biopython: 1.79
+- Device used: CPU
+- Input: one paired complete VH/VL input, passed as independent `H` and `L`
+  dictionary entries; no antigen, scFv concatenation, Replay, ColabFold, mock,
+  refinement, renumbering, or docking; one IgFold model
+
+The legacy environment is isolated from the project Python 3.11 environment,
+the existing ColabFold environment, base Python, and system Python. It follows
+the relevant official IgFold 0.4.0 dependency era (notably PyTorch 1.13.1,
+Transformers 4.24.0, AntiBERTy 0.1.3, and Biopython 1.79); `pip check` passed.
+No PyRosetta was installed, and refinement and renumbering were both disabled.
+
+The successful invocation uses a fail-closed bridge. The Python 3.11 process
+validates input and creates a new empty output directory, then invokes a fixed,
+Python-3.10-compatible worker file with a parameter list and `shell=False`.
+The VH/VL values are stored in a private request JSON rather than process
+arguments. The worker accepts only schema version 1, exactly one model,
+relative PDB filename, standard paired sequences, and false refinement/
+renumbering flags. It returns a bounded response JSON with a relative filename;
+the parent rejects a nonzero exit, missing/invalid response, symbolic links,
+path escape, no-ATOM output, wrong chains, or sequence mismatch. Sensitive
+environment variables are not passed to the worker; stdout/stderr are retained
+only as path- and token-redacted logs under ignored `runs/`.
+
+```bash
+$PROJECT_ROOT/.venv311/bin/python -m labmate.run \
+  --prediction-backend igfold \
+  --igfold-python "$IGFOLD_PYTHON" \
+  --heavy-chain-file "$SMOKE_INPUT_ROOT/heavy.txt" \
+  --light-chain-file "$SMOKE_INPUT_ROOT/light.txt" \
+  --output "$RUNS_ROOT/igfold_bridge_backend_smoke_<UTC timestamp>/output"
+```
+
+The legacy environment used its already installed official-package weights;
+the bridge ran with offline Hugging Face/Transformers mode and performed no
+model download. Its cache, environment, request/response JSON, logs, and PDB
+remain outside source control, Docker, and the release ZIP. IgFold displayed
+the JHU Academic Software License non-commercial-use notice during startup.
+
+The direct API preflight and formal bridge command both completed with exit
+code 0. IgFold reported 2.14 seconds for folding; the end-to-end bridge smoke
+completed in about 11 seconds including process startup and validation. The
+formal `PredictionResult` was `backend_name: igfold`, `status: succeeded`,
+with no warnings. It produced `igfold_prediction.pdb` (96,075 bytes; SHA-256
+`71c73e3dc958cf54171bd51590073eafc9c66b581e9007baa3c5d08869e7f1e5`),
+1,184 ATOM records, no HETATM or hydrogen atoms, and exactly H/L chains with
+125/117 residues. Recovered sequences exactly matched the paired inputs; no
+residues were missing and no non-standard residues were observed. The worker's
+only recorded native field was `prmsd` with shape `[1, 242, 4]`, retained as
+`metadata.native_metrics` with semantics `backend_native_unscaled`; it is not
+pLDDT, PAE, ipTM, pTM, or a cross-backend confidence score.
+
+An earlier separate Python 3.11 attempt remains part of the compatibility
+record: PyTorch 2.7.1 safe checkpoint loading then Transformers 5.14.1 legacy
+tokenizer removal blocked two initialization-only runs before any PDB was
+written. The successful legacy worker does not change that incompatibility
+boundary.
+
+This is a **local IgFold prediction-backend software-integration smoke test**.
+It verifies one isolated-worker invocation, H/L handling, output discovery,
+and chain-sequence preservation. It does not verify structure accuracy,
+predicted-error interpretation, docking, DB5.5, production readiness,
+affinity, binding energy, experimental validity, Docker GPU execution, cloud
+compute, or Live Remote.
+
 ## Not validated
 
+## Input contract boundary
+
+The verified Live Local path accepts complete paired VH/VL sequences, a region
+annotation CSV, and antigen PDB input. The CSV annotates existing sequences; it
+does not generate frameworks. Six CDR strings are only supported by the fixed
+Replay fixture and cannot initiate a local prediction/docking run. IgCraft was
+audited but not integrated because the available grafting interface requires a
+complete antibody PDB rather than six CDR strings.
+
+## Independent LightDock Execution Adapter Smoke Test
+
+An isolated local execution smoke used a validated IgFold VH/VL artifact as
+the ligand and `fixtures/demo_001/input/antigen.pdb` as the receptor. The
+separately installed LightDock 0.9.4 command sequence was setup, sampling,
+explicit GSO-row selection, then conformation generation. Parameters were one
+swarm, five glowworms, five GSO steps and seed 0. It produced one non-empty
+ATOM PDB pose and a run-relative manifest. This is an engineering integration
+smoke only: the native `fastdfire` score is not affinity, and no scientific
+docking, binding, epitope, experimental, or therapeutic claim follows.
+
 - IgCraft execution inside the application;
+- general antibody accuracy or real-dataset structure benchmarking;
+- general IgFold accuracy or real-dataset scientific benchmarking (one local
+  prediction-only integration smoke succeeded);
+- antigen docking from the prediction-only ColabFold result;
+- Docker GPU/ColabFold execution;
+- concurrent users or long-running recovery;
 - public or local MSA-backed ColabFold modes, templates, other model/tool
   versions, larger batches, performance, or reproducibility across machines;
 - other LightDock scoring functions or production-scale docking;
