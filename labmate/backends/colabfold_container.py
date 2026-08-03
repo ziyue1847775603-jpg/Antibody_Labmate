@@ -324,7 +324,11 @@ class ColabFoldContainerBackend:
                 warnings=["ColabFold output_dir must not be a symbolic link"],
             )
         output_dir = requested.resolve()
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure the PARENT (mapped to /work/output) exists, but do NOT
+        # pre-create the output subdirectory: the container entrypoint
+        # requires the output dir to be absent so a fresh run never
+        # accidentally reuses stale results.
+        output_dir.parent.mkdir(parents=True, exist_ok=True)
 
         fasta_name = "input.fasta"
         input_dir = self._work_root / "input"

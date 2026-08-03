@@ -277,21 +277,51 @@ class TestFixedParameters:
 
 
 # ------------------------------------------------------------------
-# Integration tests — require Docker + GPU
+# Integration tests — require Docker + GPU + REAL model weights
 # ------------------------------------------------------------------
 
 def _repo_compose_file() -> str:
     return str(Path(__file__).resolve().parents[1] / "docker-compose.live-local.yml")
 
 
+# The integration tests must use REAL preinstalled multimer_v3 weights;
+# fake weight files (used by the unit-test fixtures) would fail inside
+# the container.  Look for a real data root on this machine.
+_CANDIDATE_DATA_ROOTS = [
+    Path("d:/colabfold-data/models"),
+    Path("/mnt/d/colabfold-data/models"),
+    Path("/root/colabfold-data/models"),
+]
+
+
+def _real_data_root() -> Path | None:
+    for candidate in _CANDIDATE_DATA_ROOTS:
+        params = candidate / "params"
+        if params.is_dir() and all(
+            (params / f"params_model_{i}_multimer_v3.npz").is_file()
+            for i in range(1, 6)
+        ):
+            return candidate
+    return None
+
+
+def _real_cache_root() -> Path:
+    import tempfile
+    return Path(tempfile.mkdtemp(prefix="labmate_d3_cache_"))
+
+
 @pytest.mark.integration
 class TestColabFoldContainerIntegration:
     def test_version_and_gpu_check(self):
-        tmp, work, data, cache = _fixture_dirs()
+        data_root = _real_data_root()
+        if data_root is None:
+            pytest.skip("real ColabFold model data not found on this machine")
+        tmp, work, _data, _cache = _fixture_dirs()
+        cache = _real_cache_root()
         try:
             backend = ColabFoldContainerBackend(
                 work_root=work,
-                data_root=data,
+                data_root=data_root,
                 cache_root=cache,
                 compose_file=_repo_compose_file(),
                 timeout_seconds=300,
@@ -302,13 +332,18 @@ class TestColabFoldContainerIntegration:
             assert "jax gpu device" in gpu.get("gpu_info", "")
         finally:
             import shutil; shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(cache, ignore_errors=True)
 
     def test_predict_produces_rank1_pdb(self):
-        tmp, work, data, cache = _fixture_dirs()
+        data_root = _real_data_root()
+        if data_root is None:
+            pytest.skip("real ColabFold model data not found on this machine")
+        tmp, work, _data, _cache = _fixture_dirs()
+        cache = _real_cache_root()
         try:
             backend = ColabFoldContainerBackend(
                 work_root=work,
-                data_root=data,
+                data_root=data_root,
                 cache_root=cache,
                 compose_file=_repo_compose_file(),
                 timeout_seconds=1800,
@@ -323,3 +358,4 @@ class TestColabFoldContainerIntegration:
             assert result.pdb_path.stat().st_size > 0
         finally:
             import shutil; shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(cache, ignore_errors=True)

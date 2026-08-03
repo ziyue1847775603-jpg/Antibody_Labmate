@@ -203,9 +203,16 @@ class LightDockContainerBackend:
         # We keep most host env vars for Docker to function correctly
         # (Docker needs HOME/USER/PATH and potentially DOCKER_* vars).
         # The compose file's ${VAR:?} syntax guards the required var.
+        #
+        # The compose file declares BOTH services, so compose interpolates
+        # every referenced variable regardless of which service is run.
+        # The ColabFold variables must therefore be present even when
+        # invoking the lightdock service; they are unused by lightdock.
         self._env = {
             **os.environ,
             "LABMATE_DOCKER_WORK_ROOT": str(self._work_root),
+            "LABMATE_COLABFOLD_DATA_ROOT": str(self._work_root / "colabfold_unused_data"),
+            "LABMATE_COLABFOLD_CACHE_ROOT": str(self._work_root / "colabfold_unused_cache"),
         }
 
     # ------------------------------------------------------------------

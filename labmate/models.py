@@ -215,6 +215,10 @@ class LiveLocalJobSpec(BaseModel):
     source_type: Literal[
         "user_provided", "igcraft_generated", "project_authored_synthetic"
     ] = "user_provided"
+    # Phase D4: how the external tools are executed.
+    #   host           - user-installed executables on the host (default, unchanged)
+    #   docker_compose - isolated ColabFold GPU + LightDock CPU worker containers
+    tool_execution_provider: Literal["host", "docker_compose"] = "host"
 
     @model_validator(mode="after")
     def require_rights_confirmation(self) -> "LiveLocalJobSpec":

@@ -76,6 +76,33 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="structure prediction backend (default: replay for Replay mode)",
     )
+    run.add_argument(
+        "--tool-execution-provider",
+        choices=["host", "docker_compose"],
+        default="host",
+        help="how Live Local external tools run (default: host; docker_compose is explicit)",
+    )
+    run.add_argument(
+        "--docker-compose-file",
+        type=Path,
+        default=Path("docker-compose.live-local.yml"),
+        help="compose file for --tool-execution-provider docker_compose",
+    )
+    run.add_argument(
+        "--docker-work-root",
+        type=Path,
+        help="host work dir for --tool-execution-provider docker_compose",
+    )
+    run.add_argument(
+        "--docker-data-root",
+        type=Path,
+        help="host ColabFold model-data dir for docker_compose (read-only mount)",
+    )
+    run.add_argument(
+        "--docker-cache-root",
+        type=Path,
+        help="host JAX cache dir for docker_compose (read-write mount)",
+    )
 
     predict = subcommands.add_parser(
         "predict",
@@ -349,8 +376,39 @@ def main(argv: list[str] | None = None) -> int:
                     "Live Local currently requires the ColabFold prediction stage"
                 )
             job, candidate_fasta, regions_file, antigen_bytes = load_live_local_project(args.project)
+            colabfold_executor = None
+            lightdock_executor = None
+            provider = "host"
+            if args.tool_execution_provider == "docker_compose":
+                if args.docker_work_root is None or args.docker_data_root is None or args.docker_cache_root is None:
+                    raise LabmateError(
+                        "docker_compose provider requires --docker-work-root, "
+                        "--docker-data-root, and --docker-cache-root"
+                    )
+                from labmate.backends.live_local_docker import DockerComposeExecutors
+                executors = DockerComposeExecutors(
+                    compose_file=str(args.docker_compose_file.resolve()),
+                    docker_work_root=args.docker_work_root,
+                    colabfold_data_root=args.docker_data_root,
+                    colabfold_cache_root=args.docker_cache_root,
+                )
+                # Preflight: probe both container versions before running.
+                container_versions = executors.probe_versions()
+                colabfold_executor = executors.colabfold_executor
+                lightdock_executor = executors.lightdock_executor
+                provider = "docker_compose"
             backend = LiveLocalBackend()
-            result = backend.submit(job, candidate_fasta=candidate_fasta, regions_file=regions_file, antigen_bytes=antigen_bytes, output_root=args.output)
+            result = backend.submit(
+                job,
+                candidate_fasta=candidate_fasta,
+                regions_file=regions_file,
+                antigen_bytes=antigen_bytes,
+                output_root=args.output,
+                colabfold_executor=colabfold_executor,
+                lightdock_executor=lightdock_executor,
+                tool_execution_provider=provider,
+                container_versions=container_versions,
+            )
             mode_label = "LIVE LOCAL (VERIFIED LIVE)"
         else:
             if args.prediction_backend is not None:
