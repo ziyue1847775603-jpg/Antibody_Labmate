@@ -812,12 +812,83 @@ def _live_interface_config(job: LiveLocalJobSpec):
     )
 
 
-def execute_live_local(*, job: LiveLocalJobSpec, candidate_fasta: Path, regions_file: Path, antigen_bytes: bytes, output_root: Path) -> RunResult:
-    """Run ColabFold + LightDock supplied by the user, then analyze locally."""
-    model_data_root = _validate_preinstalled_colabfold_data(
-        job.tools.colabfold_args
-    )
-    capabilities = preflight_live_local(job)
+def execute_live_local(
+    *,
+    job: LiveLocalJobSpec,
+    candidate_fasta: Path,
+    regions_file: Path,
+    antigen_bytes: bytes,
+    output_root: Path,
+    colabfold_executor: Any | None = None,
+    lightdock_executor: Any | None = None,
+    tool_execution_provider: str = "host",
+    container_versions: dict[str, str] | None = None,
+) -> RunResult:
+    """Run ColabFold + LightDock, then analyze locally.
+
+    ``colabfold_executor`` / ``lightdock_executor`` (Phase D4) replace the
+    host ``_run`` invocations with container-based executors while reusing
+    every downstream validation stage.  When both are None the unchanged
+    host path is used.  ``container_versions`` records the probed worker
+    versions for the manifest/capabilities in docker mode.
+
+    Model-data validation is provider-scoped:
+    - host provider: the single ``--data`` path inside
+      ``job.tools.colabfold_args`` must exist (fail closed).
+    - docker_compose provider: the host ``--data`` path is NOT required;
+      model data is validated only by ``ColabFoldContainerBackend`` against
+      the docker data root.  There is no fallback to the host path.
+    """
+    docker_mode = colabfold_executor is not None or lightdock_executor is not None
+    if docker_mode:
+        model_data_root = None
+    else:
+        model_data_root = _validate_preinstalled_colabfold_data(
+            job.tools.colabfold_args
+        )
+    if docker_mode:
+        versions = container_versions or {}
+        lightdock_version = versions.get("lightdock", "not-probed")
+        capabilities = {
+            "colabfold": Capability(
+                name="colabfold",
+                status=CapabilityStatus.AVAILABLE_UNVERIFIED,
+                enabled=True,
+                provider="docker-compose colabfold worker",
+                version=versions.get("colabfold", "not-probed"),
+                license_status="external ColabFold official image; not bundled",
+                reason="Docker Compose worker selected explicitly by the user.",
+            ),
+            "lightdock_setup": Capability(
+                name="lightdock_setup",
+                status=CapabilityStatus.AVAILABLE_UNVERIFIED,
+                enabled=True,
+                provider="docker-compose lightdock worker",
+                version=lightdock_version,
+                license_status="GPL-3.0 external installation; not bundled",
+                reason="Docker Compose worker selected explicitly by the user.",
+            ),
+            "lightdock_run": Capability(
+                name="lightdock_run",
+                status=CapabilityStatus.AVAILABLE_UNVERIFIED,
+                enabled=True,
+                provider="docker-compose lightdock worker",
+                version=lightdock_version,
+                license_status="GPL-3.0 external installation; not bundled",
+                reason="Docker Compose worker selected explicitly by the user.",
+            ),
+            "lightdock_generate": Capability(
+                name="lightdock_generate",
+                status=CapabilityStatus.AVAILABLE_UNVERIFIED,
+                enabled=True,
+                provider="docker-compose lightdock worker",
+                version=lightdock_version,
+                license_status="GPL-3.0 external installation; not bundled",
+                reason="Docker Compose worker selected explicitly by the user.",
+            ),
+        }
+    else:
+        capabilities = preflight_live_local(job)
     missing = [name for name, item in capabilities.items() if not item.enabled]
     if missing:
         raise LabmateError("Live Local 预检失败，缺少工具: " + ", ".join(missing))
@@ -859,13 +930,23 @@ def execute_live_local(*, job: LiveLocalJobSpec, candidate_fasta: Path, regions_
         str(regions_file.resolve()),
         str(output_root),
         str(run_dir),
-        str(model_data_root.resolve()),
         str(Path.home()),
-        job.tools.colabfold_batch,
-        job.tools.lightdock_setup,
-        job.tools.lightdock_run,
-        job.tools.lightdock_generate,
     ]
+    if model_data_root is not None:
+        forbidden_values.append(str(model_data_root.resolve()))
+    if not docker_mode:
+        # Host-mode tool fields are full paths to user-installed executables;
+        # they are genuine local context.  In docker mode they are bare
+        # placeholder names (the real tools live in containers) and are not
+        # local context at all.
+        forbidden_values.extend(
+            [
+                job.tools.colabfold_batch,
+                job.tools.lightdock_setup,
+                job.tools.lightdock_run,
+                job.tools.lightdock_generate,
+            ]
+        )
 
     state.start(
         "S00",
@@ -873,7 +954,11 @@ def execute_live_local(*, job: LiveLocalJobSpec, candidate_fasta: Path, regions_
         notes=[
             "LIVE LOCAL; external commands are invoked only from this machine.",
             "ColabFold MSA policy is offline_single_sequence; no public MSA request is permitted.",
-            "ColabFold model data was verified as preinstalled before execution.",
+            (
+                "ColabFold model data was verified as preinstalled on the host before execution."
+                if not docker_mode
+                else "ColabFold model data is validated inside the worker container against the mounted docker data root; no host model-data path is required."
+            ),
         ],
     )
     snapshot = _sanitized_job_snapshot(job, cwd=run_dir)
@@ -969,17 +1054,29 @@ def execute_live_local(*, job: LiveLocalJobSpec, candidate_fasta: Path, regions_
         )
         output = candidate_dir / "colabfold"
         output.mkdir()
-        _run(
-            [
-                job.tools.colabfold_batch,
-                "input.fasta",
-                "colabfold",
-                *job.tools.colabfold_args,
-            ],
-            cwd=candidate_dir,
-            log_path=log,
-        )
-        result = _select_colabfold_result(output)
+        if colabfold_executor is not None:
+            # Phase D4: ColabFold runs inside the isolated GPU container.
+            # The executor returns a ColabFoldResult-compatible object whose
+            # PDB is already copied under candidate_dir/colabfold/ and whose
+            # score JSON is preserved for the exact sequence/pLDDT checks.
+            result = colabfold_executor(
+                candidate_id=candidate_id,
+                chains=chains,
+                candidate_dir=candidate_dir,
+                run_dir=run_dir,
+            )
+        else:
+            _run(
+                [
+                    job.tools.colabfold_batch,
+                    "input.fasta",
+                    "colabfold",
+                    *job.tools.colabfold_args,
+                ],
+                cwd=candidate_dir,
+                log_path=log,
+            )
+            result = _select_colabfold_result(output)
         normalized = candidate_dir / "ranked_1.pdb"
         chain_mapping = _colabfold_chain_mapping(result.pdb_path, chains)
         _rewrite_chains(result.pdb_path, normalized, chain_mapping)
@@ -1095,6 +1192,34 @@ def execute_live_local(*, job: LiveLocalJobSpec, candidate_fasta: Path, regions_
         ligand_local = work / "antibody_HL.pdb"
         shutil.copy2(cleaned, receptor_local)
         shutil.copy2(ligand, ligand_local)
+        if lightdock_executor is not None:
+            # Phase D4: LightDock runs inside the isolated CPU container.
+            # The executor performs setup/run/generate in the container and
+            # reuses the shared GSO/pose validation helpers, returning the
+            # same list types the host path would have filled.
+            candidate_poses, candidate_rows, candidate_mappings = lightdock_executor(
+                candidate_id=candidate_id,
+                work=work,
+                ligand=ligand,
+                cleaned=cleaned,
+                run_dir=run_dir,
+                job=job,
+                expected_sequences={
+                    "A": antigen_sequences["A"],
+                    "H": candidates[candidate_id]["H"],
+                    "L": candidates[candidate_id]["L"],
+                },
+                expected_residue_keys={
+                    "A": antigen_residue_keys["A"],
+                    "H": _pdb_chain_contract(ligand)[1]["H"],
+                    "L": _pdb_chain_contract(ligand)[1]["L"],
+                },
+                lightdock_version=lightdock_version,
+            )
+            poses.extend(candidate_poses)
+            docking_rows.extend(candidate_rows)
+            pose_mapping_rows.extend(candidate_mappings)
+            continue
         _run(
             [
                 job.tools.lightdock_setup,
@@ -1445,6 +1570,7 @@ def execute_live_local(*, job: LiveLocalJobSpec, candidate_fasta: Path, regions_
             "mode": "live_local",
             "backend": "local",
             "status": "verified_live",
+            "tool_execution_provider": tool_execution_provider,
             "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "input_hashes": input_hashes,
             "job": snapshot,
@@ -1460,7 +1586,11 @@ def execute_live_local(*, job: LiveLocalJobSpec, candidate_fasta: Path, regions_
             },
             "models": {
                 "colabfold_model_type": "alphafold2_multimer_v3",
-                "model_data_policy": "preinstalled_only",
+                "model_data_policy": (
+                    "user_mounted_preinstalled_only"
+                    if docker_mode
+                    else "preinstalled_only"
+                ),
                 "model_downloaded_by_application": False,
                 "msa_mode": "single_sequence",
                 "public_msa_service_used": False,

@@ -128,6 +128,28 @@ labmate run project.json --mode live_local --output runs
 
 详细输入格式见 [`examples/live_local/README.md`](examples/live_local/README.md)。真实验证记录、工具版本、失败与修复、输出哈希及未覆盖范围见 [`LIVE_LOCAL_VALIDATION.md`](LIVE_LOCAL_VALIDATION.md)。新机器或不同工具版本仍应先用很小的 smoke 参数运行并复核日志、PDB 链映射、score-pose 对应关系和 manifest。
 
+### Docker Compose Live Local（D1/D3/D4 已验证，显式 opt-in）
+
+Live Local 支持两种工具运行方式，默认仍是 `host`：
+
+| 模式 | 说明 |
+|---|---|
+| `host`（默认） | 用户安装的宿主机 ColabFold + LightDock，行为与 v0.3.0 完全一致 |
+| `docker_compose`（显式选择） | 隔离的 ColabFold 1.6.2 GPU worker + LightDock 0.9.4 CPU worker，宿主 Labmate orchestrator 通过固定 CLI 和共享 volume 调用 |
+
+```bash
+labmate run project.json --mode live_local \
+  --tool-execution-provider docker_compose \
+  --docker-work-root runs/docker-live/work \
+  --docker-data-root /path/to/colabfold-models \
+  --docker-cache-root runs/docker-live/cache \
+  --output runs/docker-live/runs
+```
+
+验证状态：D1（LightDock worker container verified）、D3（ColabFold GPU worker verified，RTX 5070 Ti / JAX GPU / rank-1 PDB 严格序列匹配）、D4（Docker Compose Live Local verified = host orchestrator + 容器化 workers，1-candidate CC0 端到端 smoke）。详见 [`docs/live_local_docker_d3.md`](docs/live_local_docker_d3.md) 与 [`docs/live_local_docker_d4.md`](docs/live_local_docker_d4.md)。
+
+这不是 fully containerized web application，不是 Live Remote，不是生产部署，也不构成科学验证。公开 Streamlit 仍为 Replay-only。模型权重/数据库由用户提供并只读挂载，不写入镜像；ColabFold 容器 `network_mode: none`（`single_sequence`）。
+
 ## 最短评委运行路径
 
 需要 Python 3.11。在项目根目录执行：

@@ -390,7 +390,6 @@ docking, binding, epitope, experimental, or therapeutic claim follows.
 - general IgFold accuracy or real-dataset scientific benchmarking (one local
   prediction-only integration smoke succeeded);
 - antigen docking from the prediction-only ColabFold result;
-- Docker GPU/ColabFold execution;
 - concurrent users or long-running recovery;
 - public or local MSA-backed ColabFold modes, templates, other model/tool
   versions, larger batches, performance, or reproducibility across machines;
@@ -400,5 +399,30 @@ docking, binding, epitope, experimental, or therapeutic claim follows.
 - PyMOL rendering (not installed; correctly `skipped_optional`);
 - ElliDock, HDOCK, Schrödinger, or any other docking provider;
 - experimental or clinical meaning of any structure, score, contact, or rank.
+
+## Docker Compose Live Local validation (Phase D1/D3/D4, 2026-08-03)
+
+A Docker Compose Live Local path is separately verified (documented in
+[`docs/live_local_docker_d1.md`](docs/live_local_docker_d1.md),
+[`docs/live_local_docker_d3.md`](docs/live_local_docker_d3.md), and
+[`docs/live_local_docker_d4.md`](docs/live_local_docker_d4.md)):
+
+- D1: LightDock 0.9.4 CPU worker container verified (setup/run/generate,
+  non-root, read-only rootfs, real fixture smoke).
+- D3: ColabFold 1.6.2 GPU worker container verified (official
+  `ghcr.io/sokrypton/colabfold:1.6.2-cuda13` base, RTX 5070 Ti, JAX GPU
+  backend, rank-1 H/L PDB with exact VH/VL sequence match, `network_mode:
+  none`, peak GPU memory 4,186 MiB).
+- D4: Docker Compose Live Local verified end to end with a host Labmate
+  orchestrator plus containerized ColabFold/LightDock workers (1-candidate
+  CC0 smoke, run `RUN-20260803-113314-b2cd5ea1`); manifest records
+  `tool_execution_provider: docker_compose`, all stages succeeded, privacy
+  audit passed.
+
+The docker_compose mode is explicit opt-in only
+(`--tool-execution-provider docker_compose`); the default `host` path is
+unchanged.  This is a software-integration validation only — not a
+scientific, docking-accuracy, affinity, or experimental validation.  Public
+Streamlit remains Replay-only.
 
 Within this explicit boundary, the current state is **`verified_live`**.

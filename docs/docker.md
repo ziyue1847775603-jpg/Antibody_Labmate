@@ -99,6 +99,52 @@ docker compose -f docker-compose.live-local.yml run --rm lightdock version
 - GPL-3.0 — the LightDock container contains an unmodified pip installation.
   When distributing the image, the corresponding source must be made available.
   This document is not legal advice.
-- ColabFold GPU worker is not yet implemented (Phase D3).
-- This is not a Dockerized Live Local — only the docking worker is containerized.
-- Do not claim Docker Live Local as verified.
+
+## Phase D3 — ColabFold GPU worker
+
+An isolated ColabFold 1.6.2 GPU worker container has been added (Phase D3)
+and verified with a real GPU smoke (RTX 5070 Ti, JAX GPU backend, rank-1
+H/L PDB with exact sequence match).
+
+- Base: official `ghcr.io/sokrypton/colabfold:1.6.2-cuda13` (digest
+  `sha256:c9eab025...`); project image `antibody-labmate-colabfold:1.6.2`
+- Source: [`docker/live/colabfold/Dockerfile`](../docker/live/colabfold/Dockerfile)
+- Adapter: [`labmate/backends/colabfold_container.py`](../labmate/backends/colabfold_container.py)
+- Docs: [`docs/live_local_docker_d3.md`](live_local_docker_d3.md)
+- GPU granted only to this service; `network_mode: none`; fixed
+  scientific parameters; no caller override.
+
+```bash
+docker compose -f docker-compose.live-local.yml build colabfold
+docker compose -f docker-compose.live-local.yml run --rm colabfold gpu-check
+```
+
+## Phase D4 — Docker Compose Live Local (end to end)
+
+Phase D4 verified the full chain with host Labmate orchestrator +
+containerized ColabFold/LightDock workers on a CC0 synthetic candidate
+(run `RUN-20260803-113314-b2cd5ea1`).
+
+- Docs: [`docs/live_local_docker_d4.md`](live_local_docker_d4.md)
+- Explicit opt-in mode: `--tool-execution-provider docker_compose`
+  (default remains `host`; no auto-detection, no silent fallback)
+- Old project.json files remain fully compatible (default host).
+
+```bash
+python -m labmate.cli run project.json --mode live_local \
+  --tool-execution-provider docker_compose \
+  --docker-work-root runs/docker-live/work \
+  --docker-data-root <model-data-dir> \
+  --docker-cache-root runs/docker-live/cache \
+  --output runs/docker-live/runs
+```
+
+**Boundaries:**
+- This is NOT a fully containerized web application; the Labmate
+  orchestrator runs on the host and the public Streamlit remains
+  Replay-only.
+- This is NOT Live Remote, a production deployment, or a scientific
+  validation.
+- No Docker socket is mounted to any web container.
+- Not validated: third-party-machine reproduction (D5), image registry
+  distribution, RFantibody container, RF2, IgCraft.
