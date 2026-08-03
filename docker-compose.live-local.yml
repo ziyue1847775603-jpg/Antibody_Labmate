@@ -1,31 +1,75 @@
-# Antibody Labmate — Live Local Docker Compose (Phase D1+)
+# Antibody Labmate — Live Local Docker Compose (Phase D1/D3/D4)
 #
 # This file is separate from docker-compose.yml (Replay-only).
-# It adds a LightDock CPU worker container that communicates with
-# Labmate solely through fixed CLI commands and a shared work volume.
+# It adds:
+#   - lightdock:  LightDock 0.9.4 CPU worker (Phase D1, verified)
+#   - colabfold:  ColabFold 1.6.2 GPU worker (Phase D3, verified)
 #
-# The work root is injected via environment variable:
-#   LABMATE_DOCKER_WORK_ROOT=/path/to/dir
+# Both workers communicate with Labmate solely through fixed CLI
+# commands and shared work volumes.
 #
-# The adapter sets this in the subprocess environment so there is no
-# reliance on shell expansion in the calling process.
+# Required environment variables (set by the Labmate adapters; the :?
+# syntax fails closed if unset):
+#   LABMATE_DOCKER_WORK_ROOT        host dir for /work mounts
+#   LABMATE_COLABFOLD_DATA_ROOT     host dir with model weights -> /models/colabfold (ro)
+#   LABMATE_COLABFOLD_CACHE_ROOT    host dir for JAX compilation cache -> /work/cache (rw)
 #
-# Usage (D1 smoke):
-#   $ export LABMATE_DOCKER_WORK_ROOT=$(pwd)/runs/docker-live
-#   $ mkdir -p "$LABMATE_DOCKER_WORK_ROOT/inputs" "$LABMATE_DOCKER_WORK_ROOT/outputs"
-#   $ docker compose -f docker-compose.live-local.yml build lightdock
+# Usage:
+#   $ docker compose -f docker-compose.live-local.yml build
 #   $ docker compose -f docker-compose.live-local.yml run --rm lightdock version
-#   $ docker compose -f docker-compose.live-local.yml run --rm lightdock setup ...
-#   $ docker compose -f docker-compose.live-local.yml run --rm lightdock run ...
-#   $ docker compose -f docker-compose.live-local.yml run --rm lightdock generate ...
+#   $ docker compose -f docker-compose.live-local.yml run --rm colabfold version
+#   $ docker compose -f docker-compose.live-local.yml run --rm colabfold gpu-check
 
 services:
+  colabfold:
+    build:
+      context: ./docker/live/colabfold
+      dockerfile: Dockerfile
+    image: antibody-labmate-colabfold:1.6.2
+    # No public ports — invoked on-demand via `docker compose run`
+    volumes:
+      # Input FASTA: read-only
+      - ${LABMATE_DOCKER_WORK_ROOT:?LABMATE_DOCKER_WORK_ROOT is required}/input:/work/input:ro
+      # Prediction output: read-write
+      - ${LABMATE_DOCKER_WORK_ROOT:?LABMATE_DOCKER_WORK_ROOT is required}/output:/work/output:rw
+      # Model weights: read-only, user-supplied
+      - ${LABMATE_COLABFOLD_DATA_ROOT:?LABMATE_COLABFOLD_DATA_ROOT is required}:/models/colabfold:ro
+      # JAX compilation cache: read-write, user-supplied
+      - ${LABMATE_COLABFOLD_CACHE_ROOT:?LABMATE_COLABFOLD_CACHE_ROOT is required}:/work/cache:rw
+    # GPU is granted ONLY to this service
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          cpus: '8'
+          memory: 16G
+    # No privileged mode, no Docker socket mount, no host network
+    privileged: false
+    # single_sequence mode needs no network at all
+    network_mode: none
+    # Read-only root filesystem; /tmp (tmpfs), /work/output and /work/cache (volumes) writable
+    read_only: true
+    tmpfs:
+      - /tmp:size=4G,mode=1777
+    # Explicitly drop all capabilities
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    stdin_open: false
+    tty: false
+
   lightdock:
     build:
       context: ./docker/live/lightdock
       dockerfile: Dockerfile
     image: antibody-labmate-lightdock:0.9.4
-    # No public ports -- this is a CLI worker invoked via `docker compose run`
+    # No public ports — invoked on-demand via `docker compose run`
     volumes:
       # Shared work directory with explicit sub-directories.
       # Both are read-write because LightDock's setup step writes
