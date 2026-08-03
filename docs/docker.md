@@ -72,3 +72,33 @@ scientific tools were not sent. The resulting image:
 The container and compose network were then stopped and removed. This verifies
 the Replay container path only. GPU passthrough, ColabFold, IgFold, LightDock,
 and any live-compute Docker configuration remain unverified.
+
+## Phase D1 — LightDock worker container
+
+An isolated LightDock 0.9.4 CPU worker container has been added (Phase D1 of
+the Live Local Docker roadmap).  This container communicates with Labmate
+solely through fixed CLI commands, exit codes, and a shared work volume.
+
+**Current status:** Built but not yet integrated into the Live Local workflow.
+No scientific validation.
+
+- Source: [`docker/live/lightdock/Dockerfile`](../docker/live/lightdock/Dockerfile)
+- Compose: [`docker-compose.live-local.yml`](../docker-compose.live-local.yml)
+  (separate from the Replay `docker-compose.yml`)
+- Adapter: [`labmate/backends/lightdock_container.py`](../labmate/backends/lightdock_container.py)
+- Docs: [`docs/live_local_docker_d1.md`](live_local_docker_d1.md)
+
+**Build and smoke:**
+
+```bash
+docker compose -f docker-compose.live-local.yml build lightdock
+docker compose -f docker-compose.live-local.yml run --rm lightdock version
+```
+
+**Constraints:**
+- GPL-3.0 — the LightDock container contains an unmodified pip installation.
+  When distributing the image, the corresponding source must be made available.
+  This document is not legal advice.
+- ColabFold GPU worker is not yet implemented (Phase D3).
+- This is not a Dockerized Live Local — only the docking worker is containerized.
+- Do not claim Docker Live Local as verified.

@@ -1,0 +1,47 @@
+# Antibody Labmate — Live Local Docker Compose (Phase D1+)
+#
+# This file is separate from docker-compose.yml (Replay-only).
+# It adds a LightDock CPU worker container that communicates with
+# Labmate solely through fixed CLI commands and a shared work volume.
+#
+# Usage (D1 smoke):
+#   docker compose -f docker-compose.live-local.yml build lightdock
+#   docker compose -f docker-compose.live-local.yml run --rm lightdock version
+#   docker compose -f docker-compose.live-local.yml run --rm lightdock setup ...
+#   docker compose -f docker-compose.live-local.yml run --rm lightdock run ...
+#   docker compose -f docker-compose.live-local.yml run --rm lightdock generate ...
+
+services:
+  lightdock:
+    build:
+      context: ./docker/live/lightdock
+      dockerfile: Dockerfile
+    image: antibody-labmate-lightdock:0.9.4
+    # No public ports — this is a CLI worker invoked via `docker compose run`
+    volumes:
+      # Shared work directory: Labmate writes inputs here, reads outputs here.
+      # Host path: ./runs/docker-live/<candidate_id>/work
+      # Container path: /work
+      - ./runs/docker-live:/work
+    # CPU-only worker; no GPU reservation
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    # No privileged mode, no Docker socket mount, no host network
+    privileged: false
+    # Explicitly drop all capabilities
+    cap_drop:
+      - ALL
+    # Read-only root filesystem except /work (mounted r/w via volume)
+    read_only: true
+    tmpfs:
+      - /tmp:size=256M,mode=1777
+    # No automatic restart — invoked on-demand via `docker compose run`
+    restart: "no"
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    stdin_open: false
+    tty: false
