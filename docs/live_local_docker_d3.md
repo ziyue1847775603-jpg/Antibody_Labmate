@@ -31,7 +31,7 @@
 
 ## 模型数据挂载（只读）
 
-- 宿主路径：`d:\colabfold-data\models`（5.2 GB）
+- 宿主路径：用户提供的预装模型数据目录（验证时约 5.2 GB；以 `--docker-data-root` 传入）
 - 容器路径：`/models/colabfold`（只读）
 - 包含 5 个 `params_model_*_multimer_v3.npz`（各 ~355 MB）+ ptm/单链变体
 - 启动前 adapter 验证全部 5 个 multimer_v3 参数文件存在

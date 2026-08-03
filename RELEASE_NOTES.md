@@ -1,6 +1,57 @@
 # Release Notes
 
-## Unreleased — Pluggable Prediction Backends
+## Unreleased
+
+Placeholder for changes after v0.4.0.
+
+## v0.4.0 — Docker Compose Live Local (2026-08-03)
+
+### Docker Compose Live Local
+
+- Added an explicit `docker_compose` tool-execution provider for Live Local:
+  the host Labmate Python 3.11 CLI orchestrates isolated worker containers
+  (ColabFold GPU + LightDock CPU) through fixed CLI commands, exit codes, and
+  shared work volumes. The default provider remains `host`; `docker_compose`
+  is explicit opt-in only (`--tool-execution-provider docker_compose`), with
+  no auto-detection and no silent fallback.
+- End-to-end chain:
+  `host Labmate orchestrator -> ColabFold GPU container -> LightDock CPU
+  container -> host-side validation / analysis / ranking / report / manifest /
+  ZIP`.
+- The Labmate orchestrator is not containerized; the public Streamlit app
+  remains Replay-only; no Docker socket is exposed to any web container.
+- Each run and each candidate uses isolated work directories; the ColabFold
+  rank-1 PDB passes the existing strict chain-mapping / exact-sequence checks
+  before becoming the LightDock ligand input.
+- Manifest records `tool_execution_provider`, worker versions, network and
+  model-data policies, per-stage status, and artifact hashes; host paths,
+  usernames, tokens, and environment dumps are never recorded.
+
+### ColabFold GPU worker
+
+- Isolated ColabFold 1.6.2 GPU worker based on the official
+  `ghcr.io/sokrypton/colabfold:1.6.2-cuda13` image (digest pinned). JAX GPU
+  backend; runtime `network_mode: none`; `single_sequence` MSA; fixed
+  `alphafold2_multimer_v3` parameters identical to the verified host backend.
+- Model weights are user-supplied preinstalled multimer-v3 files mounted
+  read-only; nothing is written into the image and no public MSA service or
+  model download occurs.
+- Entrypoint whitelist (`version` / `gpu-check` / `predict`) with fail-closed
+  validation: single-record VH:VL FASTA, standard amino acids, exactly one
+  `:` separator, no third chain, no symlinks, no caller override of scientific
+  parameters, strict output-dir contract (single-level subdirectory of the
+  mounted output root, non-empty/stale output rejected).
+- The rank-1 score JSON is matched exactly by prefix/rank/model tag, copied
+  into the formal run artifacts, and included in the manifest and ZIP.
+
+### LightDock worker
+
+- Isolated LightDock 0.9.4 CPU worker (GPL-3.0, separately licensed; see the
+  per-image third-party notices). Non-root user, read-only root filesystem,
+  whitelisted entrypoint (`version` / `setup` / `run` / `generate`), fixed
+  CLI parameters, and GPL notice retained in the image.
+
+### Prediction backends
 
 - Added a provider-neutral `PredictionBackend` / `PredictionResult` contract
   and registry with `replay`, `colabfold`, and `igfold` providers.
@@ -15,31 +66,66 @@
 - Added a Python 3.11 Replay Docker deployment. The image deliberately excludes
   ColabFold, IgFold, LightDock, model weights, databases, user uploads, and
   runtime outputs.
-- Completed one real, host-side WSL2 ColabFold 1.6.2 prediction-only smoke
-  using a single VH/VL pair, preinstalled weights, one model, one recycle, and
-  no relaxation. It produced one non-empty two-chain PDB through the new
-  wrapper. This is software-integration evidence only; it is not scientific,
-  docking, benchmark, production, Docker-GPU, or remote-worker validation.
+
+### Security and provenance hardening
+
+- Fixed a host-mode regression where `container_versions` was only assigned
+  inside the docker_compose branch (host path previously raised NameError);
+  the host Live Local path now fails closed with a clear tool-missing error.
+- Split model-data validation by provider: host mode validates the
+  `--data` path in `job.tools.colabfold_args`; docker mode validates only the
+  mounted docker data root, with no fallback to host paths. Manifest
+  `model_data_policy` records `preinstalled_only` (host) or
+  `user_mounted_preinstalled_only` (docker).
+- Rank-1 score JSON is a formal run artifact (S04 hashes, manifest, ZIP);
+  missing, ambiguous, or invalid score JSON fails closed.
+- FASTA without a `:` separator fails closed in the container entrypoint.
 - Hardened prediction output discovery against symbolic links and
   out-of-directory PDBs, bounded stdout/stderr metadata while retaining
   path-redacted logs, surfaced recovered GPU allocation warnings, and changed
   concrete backend package exports to lazy loading to prevent fresh-process
   workflow import cycles.
-- Completed one real local IgFold 0.4.0 prediction-only smoke through an
-  explicit external-interpreter bridge: the Python 3.11 Labmate process
-  invoked an isolated Python 3.10 legacy worker, which produced a non-empty
-  H/L-chain PDB with exact input-sequence preservation. This is bounded local
-  software-integration evidence only; it is not scientific, docking,
-  benchmark, production, Docker-GPU, or remote-worker validation.
-- Added a Python-3.10-compatible IgFold worker and an explicit
-  `--igfold-python` option. The bridge uses a fixed worker script, JSON files
-  under a new controlled output directory, argument-list subprocess calls with
-  `shell=False`, minimal secret-free environment, a 30-minute timeout,
-  path/token-redacted bounded logs, and fail-closed response/PDB validation.
-  It fixes one model, disables refinement/renumbering, rejects symlinks,
-  stale/out-of-directory/invalid-chain PDBs, and preserves exact H/L sequences.
-  IgFold native `prmsd` remains backend-native and unscaled; no generic
-  confidence or docking/affinity metric is fabricated.
+
+### Real software-integration validation
+
+- D1: LightDock 0.9.4 CPU worker container verified (setup/run/generate,
+  non-root, read-only rootfs, real fixture smoke).
+- D3: ColabFold 1.6.2 GPU worker container verified on an NVIDIA RTX 5070 Ti
+  (12,227 MiB): `version` / `gpu-check` / `predict` with exact VH/VL sequence
+  match and `network_mode: none`.
+- D4: Docker Compose Live Local verified end to end with a host orchestrator
+  plus containerized ColabFold/LightDock workers on one CC0 synthetic
+  candidate (final run `RUN-20260803-121251-784e9fd5`, all stages succeeded).
+- One real, host-side WSL2 ColabFold 1.6.2 prediction-only smoke using a
+  single VH/VL pair, preinstalled weights, one model, one recycle, and no
+  relaxation. It produced one non-empty two-chain PDB through the new wrapper.
+- One real local IgFold 0.4.0 prediction-only smoke through an explicit
+  external-interpreter bridge: the Python 3.11 Labmate process invoked an
+  isolated Python 3.10 legacy worker, which produced a non-empty H/L-chain PDB
+  with exact input-sequence preservation.
+- All of the above are bounded local software-integration evidence only; they
+  are not scientific, docking, benchmark, production, Docker-GPU (beyond the
+  recorded D3/D4 scope), remote-worker, or experimental validation.
+
+### Compatibility
+
+- Default `host` Live Local behavior is unchanged from v0.3.0; existing
+  project files remain fully compatible.
+- Replay, Benchmark Local, and the RFantibody design CLI are unaffected.
+- The Replay-only `docker-compose.yml` is unchanged; Live Local containers
+  live in the separate `docker-compose.live-local.yml`.
+
+### Known limitations
+
+- Docker Compose Live Local `verified_live` covers only the recorded software
+  versions, this single-machine environment, the synthetic/CC0 smoke inputs,
+  the fixed parameters, and the software-integration scope.
+- D5 third-party-machine reproduction is not completed and is future work.
+- Not included: RFantibody container, RF2, IgCraft integration, Live Remote,
+  public Streamlit compute, production deployment, scientific benchmark
+  validation, docking-accuracy validation, binder validation, affinity or
+  binding free-energy prediction, therapeutic validity, experimental
+  validation.
 
 ## v0.3.0 — Benchmark Local (2026-07-28)
 
