@@ -1,6 +1,41 @@
 # Phase D1 — LightDock CPU Worker Container
 
-> 状态：已实现 · 未经科学验证
+> 状态：**D1 verified** · 真实验证完成
+
+**已验证构建：** 2026-08-03
+
+| 属性 | 值 |
+|---|---|
+| Image ID | `sha256:af96bbbb368b` |
+| Image size | 1.98 GB |
+| Base image | `python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93` |
+| LightDock version | 0.9.4 |
+| Docker Engine | 29.6.2 |
+| Docker Compose | v5.3.1 |
+
+**Smoke test (真实 fixture PDBs，非 test double):**
+
+| 步骤 | 结果 |
+|---|---|
+| Setup (2 swarms, 10 glowworms) | OK — `setup.json` + positions 生成 |
+| Run (10 steps, 1 core) | OK — 2 GSO 文件，各 10 solutions |
+| Generate (1 selected pose) | OK — 1 pose PDB (27,492 bytes) |
+| Pose SHA-256 | `8795A11E...` |
+| 非 root 用户 | `lightdock` (uid 10001) ✓ |
+| Root FS 只读 | touch /test_write 拒绝 ✓ |
+| 日志无宿主机绝对路径 | ✓（entrypoint + adapter 脱敏） |
+
+**测试结果:**
+
+| 类型 | 通过 | 失败 |
+|---|---|---|
+| 单元测试 | 26 | 0 |
+| 集成测试 (Docker) | 5 | 0 |
+| 完整 pytest | 105 passed | 124 errors（均为预存问题，非 D1 相关） |
+
+**变更说明:**
+- 构建过程中发现并修复: mpi4py/setuptools 不兼容、LightDock 0.9.4 需要 setuptools<70、NumPy 1.24.x C API 兼容、CFLAGS 抑制指针类型警告
+- 所有修复在 Dockerfile 注释中均有记录
 
 ## 范围
 

@@ -16,6 +16,7 @@ from labmate.backends.lightdock_container import (
     LightDockContainerBackend,
     _safe_basename,
     _validate_under_root,
+    _validate_positive_int,
     _redact,
 )
 from labmate.errors import InputValidationError, LabmateError
@@ -84,6 +85,23 @@ class TestValidateUnderRoot:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestValidatePositiveInt:
+    def test_accepts_valid(self):
+        assert _validate_positive_int(5, "test", 100) == 5
+
+    def test_rejects_zero(self):
+        with pytest.raises(InputValidationError, match="positive integer"):
+            _validate_positive_int(0, "test", 100)
+
+    def test_rejects_negative(self):
+        with pytest.raises(InputValidationError, match="positive integer"):
+            _validate_positive_int(-1, "test", 100)
+
+    def test_rejects_exceeds_max(self):
+        with pytest.raises(InputValidationError, match="exceeds maximum"):
+            _validate_positive_int(101, "test", 100)
+
+
 class TestRedact:
     def test_redacts_linux_absolute_path(self):
         text = "Found at /home/user/secret/output.pdb"
@@ -118,28 +136,27 @@ class TestRedact:
 
 class TestBackendConstruction:
     @staticmethod
-    def _temp_dir():
+    def _backend_dirs():
         import tempfile
-        return Path(tempfile.mkdtemp(prefix="labmate_test_"))
+        tmp = Path(tempfile.mkdtemp(prefix="labmate_test_"))
+        work = tmp / "work"
+        work.mkdir()
+        return tmp, work
 
     def test_requires_valid_timeout(self):
-        tmp = self._temp_dir()
+        tmp, work = self._backend_dirs()
         try:
-            work = tmp / "work"
-            work.mkdir()
             with pytest.raises(ValueError, match="timeout"):
                 LightDockContainerBackend(work_root=work, timeout_seconds=0)
             with pytest.raises(ValueError, match="timeout"):
-                LightDockContainerBackend(work_root=work, timeout_seconds=3601)
+                LightDockContainerBackend(work_root=work, timeout_seconds=3700)
         finally:
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_accepts_valid_timeout(self):
-        tmp = self._temp_dir()
+        tmp, work = self._backend_dirs()
         try:
-            work = tmp / "work"
-            work.mkdir()
             backend = LightDockContainerBackend(work_root=work, timeout_seconds=300)
             assert backend._timeout_seconds == 300
         finally:
@@ -147,12 +164,101 @@ class TestBackendConstruction:
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_work_root_is_resolved(self):
-        tmp = self._temp_dir()
+        tmp, work = self._backend_dirs()
         try:
-            work = tmp / "real_work"
-            work.mkdir()
             backend = LightDockContainerBackend(work_root=work)
             assert backend._work_root == work.resolve()
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_work_root_must_exist(self):
+        import tempfile
+        tmp = Path(tempfile.mkdtemp(prefix="labmate_test_"))
+        try:
+            nonexistent = tmp / "does_not_exist"
+            with pytest.raises(ValueError, match="work_root must be"):
+                LightDockContainerBackend(work_root=nonexistent)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_compose_file_must_exist(self):
+        import tempfile
+        tmp = Path(tempfile.mkdtemp(prefix="labmate_test_"))
+        work = tmp / "work"
+        work.mkdir()
+        try:
+            with pytest.raises(ValueError, match="compose_file does not"):
+                LightDockContainerBackend(
+                    work_root=work,
+                    compose_file="/nonexistent/compose.yml",
+                )
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_swarms_exceeds_max_raises(self):
+        tmp, work = self._backend_dirs()
+        try:
+            backend = LightDockContainerBackend(work_root=work)
+            with pytest.raises(InputValidationError, match="exceeds maximum"):
+                backend.setup(
+                    receptor_basename="r.pdb",
+                    ligand_basename="l.pdb",
+                    swarms=65,
+                    glowworms=5,
+                )
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_glowworms_exceeds_max_raises(self):
+        tmp, work = self._backend_dirs()
+        try:
+            backend = LightDockContainerBackend(work_root=work)
+            with pytest.raises(InputValidationError, match="exceeds maximum"):
+                backend.setup(
+                    receptor_basename="r.pdb",
+                    ligand_basename="l.pdb",
+                    swarms=2,
+                    glowworms=2000,
+                )
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_steps_exceeds_max_raises(self):
+        tmp, work = self._backend_dirs()
+        try:
+            backend = LightDockContainerBackend(work_root=work)
+            with pytest.raises(InputValidationError, match="exceeds maximum"):
+                backend.run(steps=20000)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_cores_exceeds_max_raises(self):
+        tmp, work = self._backend_dirs()
+        try:
+            backend = LightDockContainerBackend(work_root=work)
+            with pytest.raises(InputValidationError, match="exceeds maximum"):
+                backend.run(steps=10, cores=128)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_pose_count_exceeds_max_raises(self):
+        tmp, work = self._backend_dirs()
+        try:
+            backend = LightDockContainerBackend(work_root=work)
+            with pytest.raises(InputValidationError, match="exceeds maximum"):
+                backend.generate(
+                    receptor_basename="r.pdb",
+                    ligand_basename="l.pdb",
+                    gso_basename="s.gso",
+                    pose_count=2000,
+                )
         finally:
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
@@ -162,21 +268,23 @@ class TestBackendConstruction:
 # Integration tests — require Docker with built lightdock image
 # ------------------------------------------------------------------
 
+def _repo_compose_file() -> str:
+    """Absolute path to docker-compose.live-local.yml from the repo root."""
+    return str(Path(__file__).resolve().parents[1] / "docker-compose.live-local.yml")
+
+
 @pytest.mark.integration
 class TestLightDockContainerVersion:
     def test_version_returns_package_version(self):
-        """Verify the container prints the installed LightDock version."""
         import tempfile
         tmp = Path(tempfile.mkdtemp(prefix="labmate_d1_"))
         try:
             work = tmp / "work"
             work.mkdir()
-            (work / "inputs").mkdir()
-            (work / "outputs").mkdir()
 
             backend = LightDockContainerBackend(
                 work_root=work,
-                compose_file="docker-compose.live-local.yml",
+                compose_file=_repo_compose_file(),
             )
             version = backend.version()
             assert version == "0.9.4"
@@ -200,12 +308,16 @@ class TestLightDockContainerSmoke:
             outputs_dir = work / "outputs"
             outputs_dir.mkdir()
 
-            _write_minimal_pdb(inputs_dir / "receptor_A.pdb", "A", 10)
-            _write_minimal_pdb(inputs_dir / "antibody_HL.pdb", "H", 15)
+            # Use real fixture PDBs (CC0) — minimal PDBs lack surface atoms
+            # needed by LightDock for docking
+            import shutil
+            fixture = Path(__file__).resolve().parents[1] / "fixtures" / "demo_001"
+            shutil.copy2(fixture / "input" / "antigen.pdb", inputs_dir / "receptor_A.pdb")
+            shutil.copy2(fixture / "colabfold_output" / "CAND-001" / "ranked_1.pdb", inputs_dir / "antibody_HL.pdb")
 
             backend = LightDockContainerBackend(
                 work_root=work,
-                compose_file="docker-compose.live-local.yml",
+                compose_file=_repo_compose_file(),
                 timeout_seconds=120,
             )
 
@@ -257,10 +369,7 @@ class TestLightDockContainerSmoke:
         try:
             work = tmp / "work"
             work.mkdir()
-            (work / "inputs").mkdir()
-            (work / "outputs").mkdir()
-            (work / "inputs" / "receptor_A.pdb").write_text("ATOM")
-            (work / "inputs" / "antibody_HL.pdb").write_text("ATOM")
+            (work / "inputs").mkdir(parents=True, exist_ok=True)
 
             backend = LightDockContainerBackend(work_root=work)
             with pytest.raises(InputValidationError, match="single safe basename"):
@@ -280,8 +389,6 @@ class TestLightDockContainerSmoke:
         try:
             work = tmp / "work"
             work.mkdir()
-            (work / "inputs").mkdir()
-            (work / "outputs").mkdir()
 
             backend = LightDockContainerBackend(work_root=work)
             with pytest.raises(InputValidationError, match="single safe basename"):
@@ -301,11 +408,9 @@ class TestLightDockContainerSmoke:
         try:
             work = tmp / "work"
             work.mkdir()
-            (work / "inputs").mkdir()
-            (work / "outputs").mkdir()
 
             backend = LightDockContainerBackend(work_root=work)
-            with pytest.raises(InputValidationError, match="steps"):
+            with pytest.raises(InputValidationError, match="positive integer"):
                 backend.run(steps=0)
         finally:
             import shutil

@@ -10,15 +10,18 @@ The container communicates with Labmate only through:
 - command-line arguments (list form, no shell string interpolation)
 - exit codes
 - stdout/stderr captured from the container process
-- regular PDB and GSO files written to /work/outputs
+- regular PDB and GSO files written to /work/outputs via a shared volume
+  whose host path is injected as LABMATE_DOCKER_WORK_ROOT
 
 Security invariants:
 - No docker socket is exposed to any public web container.
 - Every input path is validated to reside under the allowed work root.
 - The entrypoint in the container enforces a subcommand whitelist.
 - No eval, shell, or arbitrary command execution.
+- The compose file uses ``${VAR:?}`` syntax -- unset variable = fail.
 - Host absolute paths are redacted from captured logs.
-- Nonzero exit code → LabmateError (fail closed).
+- Nonzero exit code -> LabmateError (fail closed).
+- All numeric parameters have explicit min/max bounds.
 """
 
 from __future__ import annotations
@@ -35,14 +38,29 @@ from labmate.errors import InputValidationError, LabmateError
 # Compose file relative to the repository root
 _DEFAULT_COMPOSE_FILE = "docker-compose.live-local.yml"
 _DEFAULT_SERVICE = "lightdock"
+_DEFAULT_DOCKER_BIN = "docker"
 
-# Validate a filename is a single basename (no path traversal)
+# Parameter bounds
+_MAX_SWARMS = 64
+_MAX_GLOWWORMS = 1000
+_MAX_STEPS = 10000
+_MAX_CORES = 64
+_MAX_POSE_COUNT = 1000
+_MAX_TIMEOUT = 3600
+
+# Regex patterns
 _BASENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _ABSOLUTE_RE = re.compile(r"(?:[A-Za-z]:[\\/]|/(?:mnt|root|home|tmp)/)")
 _TOKEN_RE = re.compile(
     r"(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})"
 )
+_SAFE_SERVICE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_SAFE_DOCKER_BIN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
+
+# ------------------------------------------------------------------
+# Validation helpers
+# ------------------------------------------------------------------
 
 def _safe_basename(name: str, label: str) -> str:
     """Reject any string that is not a single safe POSIX basename."""
@@ -65,6 +83,19 @@ def _validate_under_root(path: Path, root: Path, label: str) -> Path:
     return resolved
 
 
+def _validate_positive_int(value: int, label: str, max_value: int) -> int:
+    """Reject non-positive integers or values exceeding the maximum."""
+    if not isinstance(value, int) or value < 1:
+        raise InputValidationError(
+            f"{label} must be a positive integer, got: {value}"
+        )
+    if value > max_value:
+        raise InputValidationError(
+            f"{label} exceeds maximum {max_value}, got: {value}"
+        )
+    return value
+
+
 def _redact(text: str, root: Path) -> str:
     """Remove host absolute paths and token patterns from captured text.
 
@@ -72,7 +103,6 @@ def _redact(text: str, root: Path) -> str:
     don't partially replace it and prevent the full-path match.
     """
     redacted = text
-    # Redact the resolved root path before generic patterns
     for variant in (
         str(root.resolve()),
         str(root.resolve()).replace("\\", "/"),
@@ -84,23 +114,34 @@ def _redact(text: str, root: Path) -> str:
     return redacted
 
 
+# ------------------------------------------------------------------
+# Backend
+# ------------------------------------------------------------------
+
 class LightDockContainerBackend:
     """Invoke LightDock inside the D1 worker container via ``docker compose run``.
+
+    The compose file uses ``${LABMATE_DOCKER_WORK_ROOT:?...}`` to mount
+    the host work directory.  This backend sets that variable in the
+    subprocess environment so the caller does not need to export it.
 
     Parameters
     ----------
     compose_file:
         Path to the docker-compose file (default: repo-root
-        ``docker-compose.live-local.yml``).
+        ``docker-compose.live-local.yml``).  Must exist as a regular file.
     service:
-        Compose service name (default: ``lightdock``).
+        Compose service name (default: ``lightdock``).  Validated against
+        safe pattern.
     work_root:
-        Host directory mapped to ``/work`` inside the container.
-        Input PDBs must already exist under ``<work_root>/inputs/``.
+        Host directory that will be exported as
+        ``LABMATE_DOCKER_WORK_ROOT``.  Must exist and be a directory.
+        Subdirectories ``inputs/`` and ``outputs/`` are created if missing.
     docker_bin:
-        Path to the docker executable (default: ``docker`` on PATH).
+        Path or basename of the docker executable.  Validated against
+        safe pattern.
     timeout_seconds:
-        Per-invocation timeout.
+        Per-invocation timeout (1..3600).
     """
 
     name = "lightdock_container"
@@ -111,16 +152,61 @@ class LightDockContainerBackend:
         compose_file: str | None = None,
         service: str = _DEFAULT_SERVICE,
         work_root: Path,
-        docker_bin: str = "docker",
+        docker_bin: str = _DEFAULT_DOCKER_BIN,
         timeout_seconds: int = 600,
     ) -> None:
-        self._compose_file = str(compose_file or _DEFAULT_COMPOSE_FILE)
+        # Validate service name
+        if not _SAFE_SERVICE_RE.fullmatch(service):
+            raise ValueError(
+                f"service name must be alphanumeric with dashes/underscores, "
+                f"got: {service!r}"
+            )
         self._service = service
-        self._work_root = work_root.resolve()
+
+        # Validate docker_bin (either a simple name like "docker" or a full path)
+        if not _SAFE_DOCKER_BIN_RE.fullmatch(docker_bin):
+            raise ValueError(
+                f"docker_bin must be a simple executable name or safe path, "
+                f"got: {docker_bin!r}"
+            )
         self._docker_bin = docker_bin
-        if not 1 <= timeout_seconds <= 3600:
-            raise ValueError("LightDock container timeout must be 1..3600 seconds")
+
+        # Resolve and validate compose_file
+        raw = Path(compose_file or _DEFAULT_COMPOSE_FILE)
+        self._compose_file = raw.resolve()
+        if not self._compose_file.is_file():
+            raise ValueError(
+                f"compose_file does not exist or is not a regular file: "
+                f"{self._compose_file}"
+            )
+
+        # Resolve and validate work_root
+        self._work_root = work_root.resolve()
+        if not self._work_root.is_dir():
+            raise ValueError(
+                f"work_root must be an existing directory: {self._work_root}"
+            )
+
+        # Ensure subdirectories
+        (self._work_root / "inputs").mkdir(parents=True, exist_ok=True)
+        (self._work_root / "outputs").mkdir(parents=True, exist_ok=True)
+
+        # Timeout
+        if not 1 <= timeout_seconds <= _MAX_TIMEOUT:
+            raise ValueError(
+                f"LightDock container timeout must be 1..{_MAX_TIMEOUT}s, "
+                f"got {timeout_seconds}"
+            )
         self._timeout_seconds = timeout_seconds
+
+        # Controlled environment passed to every subprocess invocation.
+        # We keep most host env vars for Docker to function correctly
+        # (Docker needs HOME/USER/PATH and potentially DOCKER_* vars).
+        # The compose file's ${VAR:?} syntax guards the required var.
+        self._env = {
+            **os.environ,
+            "LABMATE_DOCKER_WORK_ROOT": str(self._work_root),
+        }
 
     # ------------------------------------------------------------------
     # Public API — mirrors the three LightDock stages
@@ -144,25 +230,21 @@ class LightDockContainerBackend:
         """Run lightdock3_setup.py inside the container.
 
         The receptor and ligand PDBs must already exist under
-        ``<work_root>/inputs/``.  The PDBs passed as *receptor_local* /
-        *ligand_local* are validated to be under *work_root* and copied
-        into place before the container is invoked.
+        ``<work_root>/inputs/`` after this method copies them into place.
         """
         receptor = _safe_basename(receptor_basename, "receptor")
         ligand = _safe_basename(ligand_basename, "ligand")
 
-        # If caller provided local paths, copy them into the inputs directory
+        _validate_positive_int(swarms, "swarms", _MAX_SWARMS)
+        _validate_positive_int(glowworms, "glowworms", _MAX_GLOWWORMS)
+
         inputs_dir = self._work_root / "inputs"
-        inputs_dir.mkdir(parents=True, exist_ok=True)
         if receptor_local is not None:
             _validate_under_root(receptor_local, self._work_root, "receptor PDB")
             (inputs_dir / receptor).write_bytes(receptor_local.read_bytes())
         if ligand_local is not None:
             _validate_under_root(ligand_local, self._work_root, "ligand PDB")
             (inputs_dir / ligand).write_bytes(ligand_local.read_bytes())
-
-        outputs_dir = self._work_root / "outputs"
-        outputs_dir.mkdir(parents=True, exist_ok=True)
 
         return self._run_container([
             "setup",
@@ -182,8 +264,8 @@ class LightDockContainerBackend:
         cores: int = 1,
     ) -> dict[str, Any]:
         """Run lightdock3.py inside the container."""
-        if steps < 1:
-            raise InputValidationError(f"LightDock steps must be positive, got {steps}")
+        _validate_positive_int(steps, "steps", _MAX_STEPS)
+        _validate_positive_int(cores, "cores", _MAX_CORES)
 
         return self._run_container([
             "run",
@@ -203,10 +285,7 @@ class LightDockContainerBackend:
         ligand = _safe_basename(ligand_basename, "ligand")
         gso = _safe_basename(gso_basename, "gso file")
 
-        if pose_count < 1:
-            raise InputValidationError(
-                f"pose_count must be positive, got {pose_count}"
-            )
+        _validate_positive_int(pose_count, "pose_count", _MAX_POSE_COUNT)
 
         return self._run_container([
             "generate",
@@ -225,8 +304,11 @@ class LightDockContainerBackend:
 
         Returns a dict with keys: command, stdout, stderr, return_code,
         elapsed_seconds.  Raises LabmateError on nonzero exit or timeout.
+
+        The LABMATE_DOCKER_WORK_ROOT environment variable is set explicitly
+        so the compose file's ``${VAR:?}`` interpolation succeeds.
         """
-        compose_file = str(Path(self._compose_file).resolve())
+        compose_file = str(self._compose_file)
         safe_args = [self._redact_arg(a) for a in args]
 
         command = [
@@ -238,12 +320,12 @@ class LightDockContainerBackend:
             "--no-TTY",
             "--quiet-pull",
             self._service,
-            *args,  # list-form — no shell string
+            *args,
         ]
 
         display = " ".join(
-            [self._docker_bin, "compose", "-f",
-             Path(compose_file).name, "run", "--rm", self._service]
+            [Path(self._docker_bin).name, "compose", "-f",
+             self._compose_file.name, "run", "--rm", self._service]
             + safe_args
         )
 
@@ -252,6 +334,7 @@ class LightDockContainerBackend:
             completed = subprocess.run(
                 command,
                 cwd=str(self._work_root),
+                env=self._env,
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -267,7 +350,7 @@ class LightDockContainerBackend:
             ) from exc
         except OSError as exc:
             raise LabmateError(
-                f"Failed to invoke docker: {exc}"
+                f"Failed to invoke docker ({self._docker_bin}): {exc}"
             ) from exc
 
         elapsed = round(time.perf_counter() - started, 6)
