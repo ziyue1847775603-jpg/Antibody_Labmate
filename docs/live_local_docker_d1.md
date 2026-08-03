@@ -29,9 +29,21 @@
 
 | 类型 | 通过 | 失败 |
 |---|---|---|
-| 单元测试 | 26 | 0 |
-| 集成测试 (Docker) | 5 | 0 |
-| 完整 pytest | 105 passed | 124 errors（均为预存问题，非 D1 相关） |
+| D1 targeted 单元测试 | 26 | 0 |
+| D1 targeted 集成测试 (Docker) | 5 | 0 |
+| 完整 pytest | 105 passed | 124 errors（repository-wide suite blocked by pre-existing collection/setup errors；在 origin/main 上同样复现，见下方基线对比） |
+
+**pytest 基线对比（2026-08-03，同一 Python 3.11.15 环境，同一命令 `python -m pytest --tb=short`）:**
+
+| 分支 | collected | passed | failed | errors | skipped |
+|---|---|---|---|---|---|
+| origin/main | 209 | 79 | 0 | 130 | 0 |
+| feat/live-local-lightdock-container | 240 | 110 | 0 | 130 | 0 |
+
+两边 errors 数量完全一致（130 = 130）。collected/passed 差异恰好等于 D1 新增的 31 个测试（26 单元 + 5 集成），D1 分支未引入任何新错误。130 个 errors 的共同根因是 pytest `tmp_path` fixture 的 Windows 临时目录权限问题（`PermissionError: [WinError 5]` on `C:\Users\momo\AppData\Local\Temp\pytest-of-momo`），在 origin/main 上逐项复现，与 D1 新增文件无关。因此：**D1 targeted suite passed；repository-wide suite remains blocked by pre-existing collection/setup errors reproduced on origin/main。**
+
+**Inputs 挂载说明（已记录限制）:**
+LightDock `setup` 步骤会修改或生成处理后的输入 PDB（例如 `lightdock_receptor_A.pdb`），因此当前 D1 将 `/work/inputs` 挂载为 `rw`。这属于已记录限制；未来可评估"只读原始输入 + 容器内工作副本"的更严格模式。
 
 **变更说明:**
 - 构建过程中发现并修复: mpi4py/setuptools 不兼容、LightDock 0.9.4 需要 setuptools<70、NumPy 1.24.x C API 兼容、CFLAGS 抑制指针类型警告

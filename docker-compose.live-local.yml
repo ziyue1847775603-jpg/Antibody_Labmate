@@ -48,7 +48,8 @@ services:
     # Explicitly drop all capabilities
     cap_drop:
       - ALL
-    # Read-only root filesystem; only /tmp (tmpfs) and /work/outputs (volume) are writable
+    # Read-only root filesystem; /tmp (tmpfs), /work/inputs (rw volume),
+    # and /work/outputs (rw volume) are explicit writable mounts.
     read_only: true
     tmpfs:
       - /tmp:size=256M,mode=1777
