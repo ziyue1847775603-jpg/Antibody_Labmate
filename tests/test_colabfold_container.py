@@ -260,6 +260,109 @@ class TestBackendConstruction:
             import shutil; shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestPredictOutputDirContract:
+    """output_dir must be a single safe subdirectory of <work_root>/output.
+
+    These tests exercise the validation that runs BEFORE any container
+    invocation, so they need no Docker.
+    """
+
+    VH = "EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSGISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAK"
+    VL = "DIQMTQSPSSLSASVGDRVTITCRASQGISNYLAWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQYNSYPYTFGQGTKVEIK"
+
+    def _predict(self, backend, output_dir):
+        return backend.predict(self.VH, self.VL, output_dir=output_dir)
+
+    def test_custom_safe_basename_passes_validation(self):
+        tmp, work, data, cache = _fixture_dirs()
+        try:
+            backend = _make_backend(work, data, cache, docker_bin="definitely-missing-docker")
+            out = work / "output" / "custom-out-1"
+            result = self._predict(backend, out)
+            # Output-dir contract passed (no contract warning); any failure
+            # must now come from the (missing) docker invocation.
+            joined = " ".join(result.warnings).lower()
+            assert "strictly inside" not in joined
+            assert "single-level" not in joined
+            assert "not empty" not in joined
+            assert "symbolic link" not in joined
+        finally:
+            import shutil; shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_outside_work_root_rejected(self):
+        tmp, work, data, cache = _fixture_dirs()
+        try:
+            backend = _make_backend(work, data, cache)
+            outside = tmp / "elsewhere" / "out"
+            outside.mkdir(parents=True, exist_ok=True)
+            result = self._predict(backend, outside)
+            assert result.status == "failed"
+            assert any("strictly inside" in w for w in result.warnings)
+        finally:
+            import shutil; shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_nested_subdirectory_rejected(self):
+        tmp, work, data, cache = _fixture_dirs()
+        try:
+            backend = _make_backend(work, data, cache)
+            nested = work / "output" / "a" / "b"
+            result = self._predict(backend, nested)
+            assert result.status == "failed"
+            assert any("single-level" in w for w in result.warnings)
+        finally:
+            import shutil; shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_output_root_itself_rejected(self):
+        tmp, work, data, cache = _fixture_dirs()
+        try:
+            backend = _make_backend(work, data, cache)
+            result = self._predict(backend, work / "output")
+            assert result.status == "failed"
+            assert any("single-level" in w or "strictly inside" in w for w in result.warnings)
+        finally:
+            import shutil; shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_nonempty_existing_dir_rejected(self):
+        tmp, work, data, cache = _fixture_dirs()
+        try:
+            backend = _make_backend(work, data, cache)
+            out = work / "output" / "out"
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "stale.pdb").write_text("stale")
+            result = self._predict(backend, out)
+            assert result.status == "failed"
+            assert any("not empty" in w for w in result.warnings)
+        finally:
+            import shutil; shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_symlink_output_rejected(self):
+        tmp, work, data, cache = _fixture_dirs()
+        try:
+            backend = _make_backend(work, data, cache)
+            real = tmp / "real_out"
+            real.mkdir(parents=True, exist_ok=True)
+            link = work / "output" / "link"
+            try:
+                link.symlink_to(real)
+            except OSError:
+                pytest.skip("symlink creation not permitted on this host")
+            result = self._predict(backend, link)
+            assert result.status == "failed"
+            assert any("symbolic link" in w for w in result.warnings)
+        finally:
+            import shutil; shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_unsafe_basename_rejected(self):
+        tmp, work, data, cache = _fixture_dirs()
+        try:
+            backend = _make_backend(work, data, cache)
+            unsafe = work / "output" / ".."
+            result = self._predict(backend, unsafe)
+            assert result.status == "failed"
+        finally:
+            import shutil; shutil.rmtree(tmp, ignore_errors=True)
+
+
 class TestFixedParameters:
     def test_fixed_params_are_exact(self):
         # Must match the verified host backend exactly.
@@ -356,6 +459,70 @@ class TestColabFoldContainerIntegration:
             assert result.pdb_path is not None
             assert result.pdb_path.is_file()
             assert result.pdb_path.stat().st_size > 0
+        finally:
+            import shutil; shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(cache, ignore_errors=True)
+
+    def test_entrypoint_rejects_fasta_without_colon(self):
+        """Entrypoint-level check: a VH-only FASTA (no ':') must be rejected
+        by the container entrypoint BEFORE any prediction runs."""
+        data_root = _real_data_root()
+        if data_root is None:
+            pytest.skip("real ColabFold model data not found on this machine")
+        tmp, work, _data, _cache = _fixture_dirs()
+        cache = _real_cache_root()
+        try:
+            backend = ColabFoldContainerBackend(
+                work_root=work,
+                data_root=data_root,
+                cache_root=cache,
+                compose_file=_repo_compose_file(),
+                timeout_seconds=300,
+            )
+            # Write a single-chain FASTA with NO colon separator.
+            bad = work / "input" / "no_colon.fasta"
+            bad.write_text(
+                ">antibody\n"
+                "EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSGISGSGGSTYYADSVKGR"
+                "FTISRDNSKNTLYLQMNSLRAEDTAVYYCAK\n",
+                encoding="utf-8",
+            )
+            from labmate.errors import LabmateError
+            with pytest.raises(LabmateError, match="must contain a ':'"):
+                backend._run_container(["predict", "no_colon.fasta", "out"])
+        finally:
+            import shutil; shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(cache, ignore_errors=True)
+
+    def test_entrypoint_rejects_third_chain(self):
+        """Entrypoint-level check: VH:VL:EXTRA (three chains) must be
+        rejected by the container entrypoint."""
+        data_root = _real_data_root()
+        if data_root is None:
+            pytest.skip("real ColabFold model data not found on this machine")
+        tmp, work, _data, _cache = _fixture_dirs()
+        cache = _real_cache_root()
+        try:
+            backend = ColabFoldContainerBackend(
+                work_root=work,
+                data_root=data_root,
+                cache_root=cache,
+                compose_file=_repo_compose_file(),
+                timeout_seconds=300,
+            )
+            bad = work / "input" / "three_chain.fasta"
+            bad.write_text(
+                ">antibody\n"
+                "EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSGISGSGGSTYYADSVKGR"
+                "FTISRDNSKNTLYLQMNSLRAEDTAVYYCAK:"
+                "DIQMTQSPSSLSASVGDRVTITCRASQGISNYLAWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSG"
+                "SGTDFTLTISSLQPEDFATYYCQQYNSYPYTFGQGTKVEIK:"
+                "EXTRA\n",
+                encoding="utf-8",
+            )
+            from labmate.errors import LabmateError
+            with pytest.raises(LabmateError, match="exactly one ':'"):
+                backend._run_container(["predict", "three_chain.fasta", "out"])
         finally:
             import shutil; shutil.rmtree(tmp, ignore_errors=True)
             shutil.rmtree(cache, ignore_errors=True)

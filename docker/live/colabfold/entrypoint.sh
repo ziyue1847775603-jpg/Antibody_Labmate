@@ -98,6 +98,10 @@ validate_fasta() {
     [[ -n "$header" ]] || die "FASTA has no header"
     [[ "$header" == ">"* ]] || die "FASTA header must start with '>'"
 
+    # Must contain at least one ':' (VH:VL separator)
+    if [[ "$seq" != *:* ]]; then
+        die "FASTA must contain a ':' separator (VH:VL)"
+    fi
     # Must contain exactly one ':' separating VH and VL
     local vh="${seq%%:*}"
     local vl=""

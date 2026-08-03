@@ -106,7 +106,20 @@ jax gpu device: cuda:0
 | `gpu-check` | nvidia-smi + JAX GPU 设备验证 |
 | `predict INPUT_FASTA OUTPUT_DIR` | 固定参数预测；FASTA 校验（单记录、VH:VL 两链、标准氨基酸、≤20KB、无路径穿越） |
 
-拒绝：`/`、`\`、`..`、绝对路径、额外位置参数、未知参数、覆盖固定科学参数的参数、符号链接、超大 FASTA、非法氨基酸、非两链格式、空序列、第三链。
+拒绝：`/`、`\`、`..`、绝对路径、额外位置参数、未知参数、覆盖固定科学参数的参数、符号链接、超大 FASTA、非法氨基酸、非两链格式、空序列、第三链、**缺失 `:` 分隔符（entrypoint 在拆分 VH/VL 前显式检查 `[[ "$seq" == *:* ]]`）**。
+
+### Python adapter output_dir 契约（修复后）
+
+`ColabFoldContainerBackend.predict` 的 `output_dir` 必须：
+- 严格位于 `<work_root>/output` 之下（越界拒绝）；
+- 单层安全 basename 子目录（嵌套拒绝）；
+- 不存在或存在但为空（非空拒绝，禁止复用陈旧结果）；
+- 非 symlink；
+- 容器内实际使用 `output_dir.name` 作为 predict OUTPUT_DIR，输出发现使用同一真实目录。
+
+rank-1 score JSON 按 `_COLABFOLD_PDB_NAME` 解析的 prefix/rank/model tag 精确匹配
+（`<prefix>_scores_rank_<NNN>_<tag>.json`），缺失、多匹配、无效 JSON 均 fail closed；
+不采用"任意第一个 scores JSON"模糊 fallback。
 
 ## 测试
 

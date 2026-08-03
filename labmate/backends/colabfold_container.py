@@ -51,6 +51,7 @@ _MAX_FASTA_BYTES = 20_000
 
 # Regex patterns
 _BASENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_SAFE_BASENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _RANK_ONE_PDB = re.compile(r"_rank_001_.*\.pdb$")
 _ABSOLUTE_RE = re.compile(r"(?:[A-Za-z]:[\\/]|/(?:mnt|root|home|tmp)/)")
 _TOKEN_RE = re.compile(
@@ -324,11 +325,57 @@ class ColabFoldContainerBackend:
                 warnings=["ColabFold output_dir must not be a symbolic link"],
             )
         output_dir = requested.resolve()
+
+        # Output-dir contract:
+        #   - must be strictly inside <work_root>/output
+        #   - must be a single safe layer (no nested subdirectories)
+        #   - must not already exist with content (stale results rejected)
+        #   - the container receives only the basename as OUTPUT_DIR
+        output_root = (self._work_root / "output").resolve()
+        try:
+            output_dir.relative_to(output_root)
+        except ValueError:
+            return PredictionResult(
+                backend_name=self.name,
+                status="failed",
+                warnings=[
+                    "ColabFold output_dir must be strictly inside "
+                    f"<work_root>/output, got: {output_dir}"
+                ],
+            )
+        if output_dir == output_root or output_dir.parent != output_root:
+            return PredictionResult(
+                backend_name=self.name,
+                status="failed",
+                warnings=[
+                    "ColabFold output_dir must be a single-level subdirectory "
+                    "of <work_root>/output"
+                ],
+            )
+        if not _SAFE_BASENAME_RE.fullmatch(output_dir.name):
+            return PredictionResult(
+                backend_name=self.name,
+                status="failed",
+                warnings=[
+                    f"ColabFold output basename unsafe: {output_dir.name!r}"
+                ],
+            )
+        if output_dir.exists():
+            if any(output_dir.iterdir()):
+                return PredictionResult(
+                    backend_name=self.name,
+                    status="failed",
+                    warnings=[
+                        "ColabFold output_dir already exists and is not empty; "
+                        "refusing stale-result reuse"
+                    ],
+                )
+            output_dir.rmdir()
         # Ensure the PARENT (mapped to /work/output) exists, but do NOT
         # pre-create the output subdirectory: the container entrypoint
         # requires the output dir to be absent so a fresh run never
         # accidentally reuses stale results.
-        output_dir.parent.mkdir(parents=True, exist_ok=True)
+        output_root.mkdir(parents=True, exist_ok=True)
 
         fasta_name = "input.fasta"
         input_dir = self._work_root / "input"
@@ -343,7 +390,9 @@ class ColabFoldContainerBackend:
         safe_light = light[:4] + "..." if len(light) > 4 else light
 
         try:
-            record = self._run_container(["predict", fasta_name, "out"])
+            record = self._run_container(
+                ["predict", fasta_name, output_dir.name]
+            )
         except LabmateError as exc:
             return PredictionResult(
                 backend_name=self.name,
@@ -352,8 +401,8 @@ class ColabFoldContainerBackend:
                 warnings=[str(exc)],
             )
 
-        # Output discovery inside <work_root>/output/out/
-        prediction_root = self._work_root / "output" / "out"
+        # Output discovery inside the REAL requested output directory
+        prediction_root = output_dir
         pdb_candidates: list[Path] = []
         for path in prediction_root.rglob("*"):
             if path.is_symlink():

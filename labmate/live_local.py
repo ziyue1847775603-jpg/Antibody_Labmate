@@ -831,11 +831,21 @@ def execute_live_local(
     every downstream validation stage.  When both are None the unchanged
     host path is used.  ``container_versions`` records the probed worker
     versions for the manifest/capabilities in docker mode.
+
+    Model-data validation is provider-scoped:
+    - host provider: the single ``--data`` path inside
+      ``job.tools.colabfold_args`` must exist (fail closed).
+    - docker_compose provider: the host ``--data`` path is NOT required;
+      model data is validated only by ``ColabFoldContainerBackend`` against
+      the docker data root.  There is no fallback to the host path.
     """
-    model_data_root = _validate_preinstalled_colabfold_data(
-        job.tools.colabfold_args
-    )
     docker_mode = colabfold_executor is not None or lightdock_executor is not None
+    if docker_mode:
+        model_data_root = None
+    else:
+        model_data_root = _validate_preinstalled_colabfold_data(
+            job.tools.colabfold_args
+        )
     if docker_mode:
         versions = container_versions or {}
         lightdock_version = versions.get("lightdock", "not-probed")
@@ -920,9 +930,10 @@ def execute_live_local(
         str(regions_file.resolve()),
         str(output_root),
         str(run_dir),
-        str(model_data_root.resolve()),
         str(Path.home()),
     ]
+    if model_data_root is not None:
+        forbidden_values.append(str(model_data_root.resolve()))
     if not docker_mode:
         # Host-mode tool fields are full paths to user-installed executables;
         # they are genuine local context.  In docker mode they are bare
@@ -943,7 +954,11 @@ def execute_live_local(
         notes=[
             "LIVE LOCAL; external commands are invoked only from this machine.",
             "ColabFold MSA policy is offline_single_sequence; no public MSA request is permitted.",
-            "ColabFold model data was verified as preinstalled before execution.",
+            (
+                "ColabFold model data was verified as preinstalled on the host before execution."
+                if not docker_mode
+                else "ColabFold model data is validated inside the worker container against the mounted docker data root; no host model-data path is required."
+            ),
         ],
     )
     snapshot = _sanitized_job_snapshot(job, cwd=run_dir)
@@ -1571,7 +1586,11 @@ def execute_live_local(
             },
             "models": {
                 "colabfold_model_type": "alphafold2_multimer_v3",
-                "model_data_policy": "preinstalled_only",
+                "model_data_policy": (
+                    "user_mounted_preinstalled_only"
+                    if docker_mode
+                    else "preinstalled_only"
+                ),
                 "model_downloaded_by_application": False,
                 "msa_mode": "single_sequence",
                 "public_msa_service_used": False,

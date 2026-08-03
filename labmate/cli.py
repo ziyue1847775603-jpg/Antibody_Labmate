@@ -378,6 +378,7 @@ def main(argv: list[str] | None = None) -> int:
             job, candidate_fasta, regions_file, antigen_bytes = load_live_local_project(args.project)
             colabfold_executor = None
             lightdock_executor = None
+            container_versions = None
             provider = "host"
             if args.tool_execution_provider == "docker_compose":
                 if args.docker_work_root is None or args.docker_data_root is None or args.docker_cache_root is None:

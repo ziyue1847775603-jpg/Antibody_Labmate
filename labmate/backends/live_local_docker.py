@@ -24,6 +24,7 @@ Security invariants:
 
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +33,13 @@ from typing import Any
 from labmate.backends.colabfold_container import ColabFoldContainerBackend
 from labmate.backends.lightdock_container import LightDockContainerBackend
 from labmate.errors import InputValidationError, LabmateError
+
+# Matches ColabFold's official output naming:
+#   <prefix>_<unrelaxed|relaxed>_rank_<NNN>_<model tag>.pdb
+_COLABFOLD_PDB_NAME = re.compile(
+    r"^(?P<prefix>.+)_(?P<kind>unrelaxed|relaxed)_rank_"
+    r"(?P<rank>[0-9]{3})_(?P<tag>.+)\.pdb$"
+)
 
 # Reuse the shared validation helpers from the host workflow so there is
 # exactly one set of chain/pose/score checks for both execution paths.
@@ -161,35 +169,59 @@ class DockerComposeExecutors:
                 + "; ".join(result.warnings)
             )
 
-        # Copy the rank-1 PDB and its score JSON into the host layout
-        # so downstream chain mapping / pLDDT checks are unchanged.
+        # Copy the rank-1 PDB and its EXACTLY matching score JSON into the
+        # host layout so downstream chain mapping / pLDDT checks and the
+        # formal artifact list are unchanged.  The score JSON must match
+        # the selected rank-1 PDB's prefix/rank/model tag; an ambiguous
+        # "any first scores JSON" fallback is rejected.
         container_dir = candidate_dir / "colabfold"
         container_dir.mkdir(parents=True, exist_ok=True)
         pdb_dest = container_dir / result.pdb_path.name
         shutil.copy2(result.pdb_path, pdb_dest)
 
-        score_path: Path | None = None
-        for candidate in output_root.rglob("*"):
-            if candidate.is_file() and "scores_rank_001" in candidate.name:
-                score_path = candidate
-                break
-        if score_path is None:
-            # Fall back to any *_scores_rank_*.json
-            for candidate in output_root.rglob("*_scores_rank_*.json"):
-                score_path = candidate
-                break
-        if score_path is None:
+        pdb_name = result.pdb_path.name
+        match = _COLABFOLD_PDB_NAME.fullmatch(pdb_name)
+        if match is None:
             raise LabmateError(
-                f"{candidate_id} ColabFold 容器输出缺少 score JSON"
+                f"{candidate_id} ColabFold rank-1 PDB 文件名不符合官方 schema: {pdb_name}"
             )
-        scores = __import__("json").loads(score_path.read_text(encoding="utf-8"))
+        expected_score_name = (
+            f"{match.group('prefix')}_scores_rank_{match.group('rank')}_"
+            f"{match.group('tag')}.json"
+        )
+        score_candidates = [
+            path
+            for path in output_root.rglob("*.json")
+            if path.is_file() and path.name == expected_score_name
+        ]
+        if len(score_candidates) != 1:
+            raise LabmateError(
+                f"{candidate_id} ColabFold score JSON 匹配不唯一或缺失: "
+                f"expected exactly one {expected_score_name}, "
+                f"found {len(score_candidates)}"
+            )
+        score_source = score_candidates[0]
+        try:
+            scores = __import__("json").loads(
+                score_source.read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError) as exc:
+            raise LabmateError(
+                f"{candidate_id} ColabFold score JSON 无效: {exc}"
+            ) from exc
+        if not isinstance(scores, dict):
+            raise LabmateError(
+                f"{candidate_id} ColabFold score JSON 必须是对象"
+            )
+        score_dest = container_dir / expected_score_name
+        shutil.copy2(score_source, score_dest)
 
         return ColabFoldResult(
             pdb_path=pdb_dest,
-            score_path=score_path,
+            score_path=score_dest,
             scores=scores,
             rank=1,
-            model_tag="alphafold2_multimer_v3_model_1_seed_000",
+            model_tag=match.group("tag"),
         )
 
     # ------------------------------------------------------------------
