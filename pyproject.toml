@@ -31,3 +31,6 @@ labmate = ["reporting/templates/*.j2"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
+markers = [
+    "integration: tests that require a running Docker daemon with built images",
+]

@@ -1,0 +1,62 @@
+# Antibody Labmate — Live Local Docker Compose (Phase D1+)
+#
+# This file is separate from docker-compose.yml (Replay-only).
+# It adds a LightDock CPU worker container that communicates with
+# Labmate solely through fixed CLI commands and a shared work volume.
+#
+# The work root is injected via environment variable:
+#   LABMATE_DOCKER_WORK_ROOT=/path/to/dir
+#
+# The adapter sets this in the subprocess environment so there is no
+# reliance on shell expansion in the calling process.
+#
+# Usage (D1 smoke):
+#   $ export LABMATE_DOCKER_WORK_ROOT=$(pwd)/runs/docker-live
+#   $ mkdir -p "$LABMATE_DOCKER_WORK_ROOT/inputs" "$LABMATE_DOCKER_WORK_ROOT/outputs"
+#   $ docker compose -f docker-compose.live-local.yml build lightdock
+#   $ docker compose -f docker-compose.live-local.yml run --rm lightdock version
+#   $ docker compose -f docker-compose.live-local.yml run --rm lightdock setup ...
+#   $ docker compose -f docker-compose.live-local.yml run --rm lightdock run ...
+#   $ docker compose -f docker-compose.live-local.yml run --rm lightdock generate ...
+
+services:
+  lightdock:
+    build:
+      context: ./docker/live/lightdock
+      dockerfile: Dockerfile
+    image: antibody-labmate-lightdock:0.9.4
+    # No public ports -- this is a CLI worker invoked via `docker compose run`
+    volumes:
+      # Shared work directory with explicit sub-directories.
+      # Both are read-write because LightDock's setup step writes
+      # processed PDBs back into the inputs directory.
+      #   ${LABMATE_DOCKER_WORK_ROOT}/inputs  -> /work/inputs  (read-write)
+      #   ${LABMATE_DOCKER_WORK_ROOT}/outputs -> /work/outputs (read-write)
+      #
+      # The :? syntax causes docker compose to fail with a clear message
+      # if the variable is unset or empty -- no silent fallback.
+      - ${LABMATE_DOCKER_WORK_ROOT:?LABMATE_DOCKER_WORK_ROOT is required}/inputs:/work/inputs:rw
+      - ${LABMATE_DOCKER_WORK_ROOT:?LABMATE_DOCKER_WORK_ROOT is required}/outputs:/work/outputs:rw
+    # CPU-only worker; no GPU reservation
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    # No privileged mode, no Docker socket mount, no host network
+    privileged: false
+    # Explicitly drop all capabilities
+    cap_drop:
+      - ALL
+    # Read-only root filesystem; /tmp (tmpfs), /work/inputs (rw volume),
+    # and /work/outputs (rw volume) are explicit writable mounts.
+    read_only: true
+    tmpfs:
+      - /tmp:size=256M,mode=1777
+    # No automatic restart -- invoked on-demand via `docker compose run`
+    restart: "no"
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    stdin_open: false
+    tty: false
