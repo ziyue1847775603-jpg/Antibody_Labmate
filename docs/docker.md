@@ -54,6 +54,12 @@ scientifically validated. The recorded synthetic integrations are software
 integration checks only; they are not affinity, free-energy, specificity,
 safety, efficacy, or experimental validation.
 
+A multi-container Docker feasibility audit for Live Local is documented at
+[`docs/live_local_docker_feasibility.md`](live_local_docker_feasibility.md).
+It covers tool-environment compatibility, CUDA/Python conflicts, licensing
+risks, recommended architecture, and phased implementation. No Live Local
+Docker implementation has been built or verified.
+
 ## Replay container validation
 
 On 2026-07-29 the Replay image was built from this working tree with Docker
