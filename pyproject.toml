@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "antibody-labmate"
-version = "0.3.0"
+version = "0.4.0"
 description = "Auditable Replay and local antibody-to-docking workflow"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"

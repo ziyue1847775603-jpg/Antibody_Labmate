@@ -20,7 +20,7 @@ def _config(**updates: object) -> BenchmarkRunConfig:
         "seed": 0,
         "timeout_seconds": 3600,
         "minimum_valid_pose_count": 1,
-        "software_versions": {"labmate": "0.3.0", "lightdock": "0.9.4"},
+        "software_versions": {"labmate": "0.4.0", "lightdock": "0.9.4"},
     }
     values.update(updates)
     return BenchmarkRunConfig.model_validate(values)

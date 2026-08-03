@@ -35,7 +35,7 @@ Replay、Benchmark Local、RFantibody design 不受影响。
 python -m labmate.cli run project.json --mode live_local \
   --tool-execution-provider docker_compose \
   --docker-work-root runs/docker-live/work \
-  --docker-data-root d:\colabfold-data\models \
+  --docker-data-root /path/to/preinstalled-colabfold-models \
   --docker-cache-root runs/docker-live/cache \
   --output runs/docker-live/runs
 ```

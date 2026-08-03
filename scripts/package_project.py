@@ -62,13 +62,26 @@ REQUIRED_RELEASE_PATHS = {
     ".dockerignore",
     "Dockerfile",
     "docker-compose.yml",
+    "docker-compose.live-local.yml",
+    "docker/live/colabfold/Dockerfile",
+    "docker/live/colabfold/entrypoint.sh",
+    "docker/live/colabfold/THIRD_PARTY_NOTICES_ColabFold.md",
+    "docker/live/lightdock/Dockerfile",
+    "docker/live/lightdock/entrypoint.sh",
+    "docker/live/lightdock/THIRD_PARTY_NOTICES_LightDock.md",
     "docs/docker.md",
+    "docs/live_local_docker_d1.md",
+    "docs/live_local_docker_d3.md",
+    "docs/live_local_docker_d4.md",
     "labmate/run.py",
     "labmate/backends/base.py",
     "labmate/backends/registry.py",
     "labmate/backends/replay.py",
     "labmate/backends/colabfold.py",
+    "labmate/backends/colabfold_container.py",
     "labmate/backends/igfold.py",
+    "labmate/backends/lightdock_container.py",
+    "labmate/backends/live_local_docker.py",
     "labmate/prediction_artifact.py",
     "labmate/design/__init__.py",
     "labmate/design/artifact.py",
@@ -88,6 +101,8 @@ REQUIRED_RELEASE_PATHS = {
     "labmate/benchmarking/evaluation.py",
     "tests/test_benchmark_metrics.py",
     "tests/test_benchmark_evaluation.py",
+    "tests/test_colabfold_container.py",
+    "tests/test_live_local_docker.py",
     "labmate/workers/__init__.py",
     "labmate/workers/igfold_worker.py",
     "labmate/workers/rfantibody_worker.py",
@@ -150,6 +165,10 @@ def included_files() -> list[Path]:
                     f"Release refuses symlinked file: {relative.as_posix()}"
                 )
             if not path.is_file():
+                continue
+            # A git worktree stores ".git" as a pointer FILE rather than a
+            # directory; it must be excluded like the ".git" directory case.
+            if name == ".git" or any(part == ".git" for part in relative.parts):
                 continue
             if path.suffix.lower() in {".pyc", ".pyo", ".zip"}:
                 continue
