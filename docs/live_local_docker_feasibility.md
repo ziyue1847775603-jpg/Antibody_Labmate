@@ -32,30 +32,40 @@ ColabFold（AlphaFold2-based）→ LightDock
 
 ### 2.1 各工具需求汇总
 
+> **注意：** 下表列出的 Python、CUDA 和依赖版本是 Antibody Labmate 当前拟采用
+> 或已验证的固定环境，**不代表上游工具永久或唯一要求**。RFantibody 官方要求是
+> CUDA 11.8+，若项目固定到具体镜像需另行记录 digest。ColabFold 的 Python/CUDA
+> 要求随版本、JAX 和镜像变化，实施时必须锁定镜像 tag + digest。不要把 Python
+> 3.10 或 CUDA 12.1+ 写成所有版本的绝对要求。
+
 | 维度 | Antibody Labmate | RFantibody 官方 | ColabFold 1.6.2 | LightDock 0.9.4 |
 |---|---|---|---|---|
-| **Python** | **3.11** (>=3.11,<3.13) | **3.10** | **3.10** (conda) | 3.x（3.6+，已验证 3.11） |
-| **ML 框架** | 无（仅 stdlib + Jinja2/Pydantic/Streamlit） | **PyTorch** (CUDA 11.8) | **JAX** (CUDA 12.1+) | 无 GPU 依赖 |
-| **CUDA** | 不需要 | **11.8** | **12.1+** (推荐 12.4) | 不需要 |
-| **cuDNN** | 不需要 | 8 (含于基础镜像) | **9** | 不需要 |
+| **Python** | **3.11** (>=3.11,<3.13) — 当前 orchestrator 固定版本 | **3.10** — RFantibody 官方 Docker/uv 环境默认 | **3.10** (conda) — 当前项目 ColabFold 验证环境记录 | 3.x（3.6+，当前项目验证 3.11 可用） |
+| **ML 框架** | 无（仅 stdlib + Jinja2/Pydantic/Streamlit） | **PyTorch** (CUDA 11.8) — 官方 Docker 基础镜像 | **JAX** — 实际 CUDA 版本取决于 JAX wheel 和镜像 tag | 无 GPU 依赖 |
+| **CUDA** | 不需要 | **11.8** — 官方 Docker 基础镜像；官方最低要求为 11.8+ | 验证环境使用 CUDA 12.1+；新版本可能不同 | 不需要 |
+| **cuDNN** | 不需要 | 8 (含于官方基础镜像) | 随 JAX/CUDA 版本锁定 | 不需要 |
 | **GPU 需求** | 不需要 | **必须** (NVIDIA) | **必须**（Ampere SM 8.0+ 可选 Pallas 加速） | 不需要 |
-| **基础 OS** | Debian slim (Python 3.11-slim) | Ubuntu 22.04 | Ubuntu 22.04 | 任意 Linux |
+| **基础 OS** | Debian slim (Python 3.11-slim) | Ubuntu 22.04（官方 Docker 基础） | Ubuntu 22.04 | 任意 Linux |
 | **特殊依赖** | 无 | DGL (CUDA custom build), e3nn, USalign | HH-suite, Kalign, MMseqs2, OpenMM, PDBFixer | NumPy, SciPy, Cython, BioPython, MPI4py, ProDy |
 | **模型权重** | 无 | `RFdiffusion_Ab.pt` (~1.7 GB), `ProteinMPNN_v48_noise_0.2.pt` | `params_model_*_multimer_v3.npz` ×5 (~10 GB) | 无 |
 | **数据库** | 无 | 无 | MMseqs2/UniRef 等（仅 MSA-backed 模式需要；`single_sequence` 模式不需要） | 无 |
 | **官方 Docker** | 现有 Replay-only Dockerfile | **是** — `nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04`，Apptainer `.sif` ~8 GB | **社区有** — `jysgro/colabfold` (~16.2 GB)；上游 ColabFold 有 CUDA 12/13 镜像 | **无** |
 | **许可证** | MIT | MIT（code）；模型权重条款需用户自行审核 | MIT（code）；AlphaFold 模型/数据条款需单独审核 | **GPL-3.0** |
-| **可再分发** | MIT 源码可 | 源码 MIT 可；权重需用户自行下载 | 源码 MIT 可；权重需用户自行下载 | GPL-3.0：可分发但含 copyleft 义务；官方建议独立安装 |
+| **可再分发** | MIT 源码可 | 源码 MIT 可；权重需用户自行下载 | 源码 MIT 可；权重需用户自行下载 | GPL-3.0：分发时需保留许可证、来源和适用的源代码义务 |
 
 ### 2.2 关键依赖冲突
 
+> 以下冲突基于当前拟采用或已验证的固定环境。若上游工具发布新版本（例如
+> ColabFold 支持 Python 3.11 或 RFantibody 升级 CUDA 基础镜像），部分冲突
+> 可能缓解。实施时应以锁定的镜像 tag + digest 为准。
+
 | 冲突 | 严重程度 | 说明 |
 |---|---|---|
-| **Python 3.10 vs 3.11** | 高 | RFantibody 和 ColabFold 官方要求 Python 3.10；Labmate 要求 3.11。无法共用一个 Python 环境。 |
-| **CUDA 11.8 vs 12.1+** | 高 | RFantibody 使用 CUDA 11.8 基础镜像；ColabFold v1.6.2 需要 CUDA 12.1+。无法共享 GPU 驱动层配置。 |
+| **Python 3.10 vs 3.11** | 高 | 当前 RFantibody 官方 Docker 默认 Python 3.10；当前项目 ColabFold 验证环境使用 Python 3.10 (conda)；Labmate orchestrator 使用 Python 3.11。当前三者无法共用一个 Python 环境。 |
+| **CUDA 11.8 vs 12.1+** | 高 | RFantibody 官方 Docker 基础镜像使用 CUDA 11.8；当前项目 ColabFold 验证环境使用 CUDA 12.1+。不同 CUDA major 版本不能在同一容器内共存。 |
 | **PyTorch vs JAX** | 中 | 若分容器部署则无冲突。同一容器内同时安装会增加镜像体积和依赖复杂度。 |
-| **LightDock GPL-3.0 vs MIT** | 中 | GPL-3.0 含 copyleft 条款。若将 LightDock 打包进 MIT 镜像分发，整个镜像可能需要遵循 GPL-3.0。官方建议独立安装。 |
-| **DGL CUDA custom build** | 高 | RFantibody 需要 DGL 的 CUDA 定制编译版本；标准 pip 安装可能不可用。需要匹配 CUDA 11.8 的特定构建。 |
+| **LightDock GPL-3.0 vs MIT** | 中 | LightDock 保持为独立安装和独立进程，通过命令行、退出码和普通文件产物与 Labmate 通信。独立容器主要用于依赖隔离、版本固定和许可证告知清晰度。容器边界本身不自动决定两个程序是否构成单一作品。分发时必须保留 LightDock 的许可证、来源和适用的源代码义务。本文不是法律意见，如公开分发整套镜像或紧密集成，应进一步审查许可证义务。 |
+| **DGL CUDA custom build** | 高 | RFantibody 需要 DGL 的 CUDA 定制编译版本；标准 pip 安装可能不可用。需匹配具体 CUDA 版本的构建。 |
 | **ColabFold RAM 需求** | 高 | 社区报告 80-96 GB RAM；单容器部署可能需要极高资源配置，不利于本地开发机。 |
 | **ColabFold disk 需求** | 高 | 若不挂载数据库则只需权重 (~10 GB)；若启用 MSA 模式则需 80-180 GB。当前验证只使用 `single_sequence`，无需数据库。 |
 
@@ -68,10 +78,10 @@ ColabFold（AlphaFold2-based）→ LightDock
 - 无跨容器通信开销
 
 **缺点：**
-- Python 3.10/3.11 冲突 —— 必须选择一个 Python 版本，另一个工具可能需要 patch
-- CUDA 11.8/12.1 冲突 —— 必须选择一个 CUDA 版本
+- Python 版本差异 —— 当前 RFantibody 和 ColabFold 验证环境使用 Python 3.10，Labmate orchestrator 使用 3.11；同一容器内必须选择单一 Python 版本，可能需要 patch
+- CUDA 版本差异 —— RFantibody 官方基础镜像使用 CUDA 11.8，当前 ColabFold 验证环境使用 CUDA 12.1+；同一容器只能使用一种 CUDA 基础镜像
 - PyTorch + JAX 共存 —— 镜像体积巨大（估计 >30 GB）
-- GPL-3.0 与 MIT 混合 —— 分发许可证复杂
+- 许可证告知不清 —— 单一镜像模糊了各组件各自的许可证边界，不利于分发时履行告知义务
 - 无法独立扩缩 GPU 资源（ColabFold 需要大量显存，RFantibody 次之，LightDock 不需要 GPU）
 - 构建时间长，CI 困难
 - 单一故障域
@@ -84,7 +94,7 @@ ColabFold（AlphaFold2-based）→ LightDock
 - 每个工具使用官方推荐环境，无版本冲突
 - 可独立更新各容器
 - GPU 仅分配给需要它的容器
-- 许可证隔离（GPL-3.0 LightDock 独立容器）
+- 许可证边界清晰（LightDock GPL-3.0 独立容器，各组件许可证可分别告知）
 - 可独立扩缩
 - 镜像体积可控
 
@@ -280,14 +290,15 @@ docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
 | ProteinMPNN 源码 | MIT | 是 | 权重不能分发 |
 | ColabFold 源码 | MIT | 是 | AlphaFold 权重/数据条款需单独审核 |
 | AlphaFold 权重 | CC BY-NC 4.0 / AlphaFold 条款 | **否** | 必须用户自行下载；非商业限制可能存在 |
-| **LightDock** | **GPL-3.0** | 可但需注意 | **copyleft**：若与 MIT 代码混合分发，可能触发 GPL 义务。建议作为独立容器，用户自行安装 |
+| **LightDock** | **GPL-3.0** | 可构建但需保留许可证、来源和适用源代码义务 | LightDock 保持为独立安装和独立进程，通过命令行、退出码和普通文件产物与 Labmate 通信。独立容器主要用于依赖隔离、版本固定和许可证告知清晰度。容器边界本身不自动决定两个程序是否构成单一作品。本文不是法律意见；如公开分发整套镜像或紧密集成，应进一步审查许可证义务。 |
 | LightDock 依赖（NumPy, SciPy 等） | BSD/MIT | 是 | 无 |
 
 **关键建议：**
-1. LightDock 容器应构建为独立的 GPL-3.0 组件，通过 volume 挂载或独立安装方式使用。
-2. 所有模型权重和数据库通过 host volume 挂载，不进入镜像层。
-3. 在文档中明确告知用户需自行获取并审核权重/数据库许可。
-4. 现有 Replay-only Docker（MIT）不受影响，继续维持纯净 MIT 分发。
+1. LightDock 作为独立容器或独立安装，通过命令行接口和文件产物与 Labmate 通信。独立容器主要服务于依赖隔离和版本固定。
+2. 分发时必须保留 LightDock 的 GPL-3.0 许可证文本、版权声明和适用的源代码义务。
+3. 所有模型权重和数据库通过 host volume 挂载，不进入镜像层。
+4. 在文档中明确告知用户需自行获取并审核权重/数据库许可。
+5. 现有 Replay-only Docker（MIT）不受影响，继续维持 MIT 分发。
 
 ## 8. 最小 Smoke Test 路线
 
@@ -365,7 +376,7 @@ scoring=fastdfire, score_direction=higher_is_better
 | **DGL CUDA 11.8 wheel 可用性** | D2 | RFantibody 官方 Dockerfile 已处理；若独立构建需验证 DGL wheel 源 |
 | **跨容器 subprocess 调用方式** | D1-D4 | 初期用 `docker exec`；长期考虑 HTTP wrapper |
 | **ColabFold 非确定性** | D5 | AlphaFold 推理含浮点非确定性（JAX XLA）；可接受微小数值差异 |
-| **LightDock GPL-3.0 分发义务** | D1 | 容器内 pip install 官方包，不修改源码；独立容器避免许可证混合 |
+| **LightDock GPL-3.0 分发义务** | D1 | 容器内 pip install 官方包，不修改源码；独立容器便于许可证告知清晰；如公开分发整套镜像或紧密集成，应进一步审查许可证义务 |
 | **WSL2 vs 原生 Linux GPU 性能** | D4-D5 | WSL2 已验证可运行；原生 Linux 预期性能更好但未测试 |
 | **RFantibody RF2 阶段** | D2+ | 官方流程包含 RF2 筛选，但 Labmate 未集成；Phase D2 仅覆盖 RFdiffusion + ProteinMPNN |
 | **多候选批量运行资源** | D4-D5 | 当前 smoke 仅 1 candidate；N candidate 需要 N 次 ColabFold 调用，资源线性增长 |
@@ -384,12 +395,15 @@ scoring=fastdfire, score_direction=higher_is_better
 
 ## 附录 B：关键版本对照
 
+> 以下为 Antibody Labmate 当前拟采用或已验证的固定版本，随上游工具更新可能变化。
+> 实施时必须以锁定的镜像 tag + digest 为准。
+
 | 工具 | Antibody Labmate 使用/验证版本 | 官方最新 | 备注 |
 |---|---|---|---|
-| Antibody Labmate | 0.3.0 | — | Python 3.11 |
-| ColabFold | 1.6.2 (alphafold-colabfold 2.3.18) | 1.6.2 | 验证使用 single_sequence + multimer_v3 |
+| Antibody Labmate | 0.3.0 | — | orchestrator 当前使用 Python 3.11 |
+| ColabFold | 1.6.2 (alphafold-colabfold 2.3.18) | 1.6.2 | 当前验证使用 single_sequence + multimer_v3；Python/CUDA 要求随版本变化 |
 | LightDock | 0.9.4 | 0.9.4 | GPL-3.0，独立安装 |
-| RFantibody | 1.0.0 (bridge) | 1.0.0 | 仅 VHH 模式；RFdiffusion + ProteinMPNN |
+| RFantibody | 1.0.0 (bridge) | 1.0.0 | 仅 VHH 模式；RFdiffusion + ProteinMPNN；官方要求 CUDA 11.8+ |
 | RF2 | **未集成** | 含于 RFantibody 官方 | Labmate 未调用 |
-| IgFold | 0.4.0 (prediction-backend smoke) | 0.4.0 | JHU Academic License；Python 3.10 worker |
+| IgFold | 0.4.0 (prediction-backend smoke) | 0.4.0 | JHU Academic License；当前验证使用 Python 3.10 worker |
 | IgCraft | `audited_not_integrated` | 0.0.1 (commit `4a053de`) | 接口不兼容（要求完整 PDB） |
