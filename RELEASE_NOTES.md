@@ -2,7 +2,56 @@
 
 ## Unreleased
 
-Placeholder for changes after v0.4.0.
+Placeholder for changes after v0.4.1.
+
+## v0.4.1 — AMD/ROCm Compatibility Trial (2026-08-03)
+
+> **试验版 / TRIAL RELEASE — AMD ROCm GPU 硬件尚未验证**
+
+v0.4.1 新增 AMD/ROCm GPU 兼容支持。所有 AMD 组件已实现并通过 compose 合同
+测试，但**尚未在真实 AMD GPU 硬件上运行**。此版本供 AMD GPU 持有者测试。
+
+### AMD/ROCm ColabFold GPU worker
+
+- 独立 AMD compose 文件 `docker-compose.live-local-amd.yml`。
+- 基于 `rocm/jax-community:latest` 自建 ColabFold 1.6.2 Docker 镜像
+  （上游无官方 ColabFold ROCm 镜像，仅 CUDA 12/13）。
+- `gpu-check` 使用 `rocm-smi`（取代 `nvidia-smi`）；`predict` 子命令
+  和所有固定科学参数与 NVIDIA 版本完全相同。
+- GPU 设备通过 `devices: [/dev/kfd, /dev/dri]` + `group_add: video` 挂载
+  （取代 NVIDIA 的 `deploy.resources.reservations.devices: driver nvidia`）。
+- Python adapter（`ColabFoldContainerBackend`、`DockerComposeExecutors`）
+  为 GPU 厂商无关；用户仅需通过 `--docker-compose-file` 指向 AMD compose
+  文件即可切换。
+
+### LightDock CPU worker
+
+与 NVIDIA 版本完全相同（纯 CPU，无需改动）。
+
+### 已知限制
+
+- **真实 AMD GPU 硬件验证 pending**：全部 AMD 文件已通过 13 个 compose
+  合同测试，但未在 AMD GPU 上运行真实 ColabFold prediction。
+- OpenMM 在 ROCm 上回退 CPU 模式（`--num-relax 0` 跳过能量最小化，无影响）。
+- `rocm/jax-community:latest` digest 尚未锁定（首次真实构建后记录）。
+- 端到端 Docker Compose Live Local AMD smoke（D4）尚未执行。
+
+### CLI 用法
+
+```bash
+python -m labmate.cli run project.json --mode live_local \
+  --tool-execution-provider docker_compose \
+  --docker-compose-file docker-compose.live-local-amd.yml \
+  --docker-work-root runs/docker-live/work \
+  --docker-data-root /path/to/preinstalled-colabfold-models \
+  --docker-cache-root runs/docker-live/cache \
+  --output runs/docker-live/runs
+```
+
+### 兼容性
+
+- v0.4.0 的 host / NVIDIA docker_compose Live Local 流程完全不变。
+- Replay、Benchmark Local、RFantibody design CLI 不受影响。
 
 ## v0.4.0 — Docker Compose Live Local (2026-08-03)
 

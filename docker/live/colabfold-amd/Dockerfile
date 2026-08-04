@@ -36,6 +36,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     JAX_PLATFORMS=rocm \
     JAX_COMPILATION_CACHE_DIR=/work/cache/jax
 
+# System dependencies: colabfold_batch needs kalign even in single_sequence
+# mode (for the single-sequence alignment object).  hhsuite and mmseqs2 are
+# required for MSA-backed modes but NOT for single_sequence; they are
+# included for completeness in case the user switches modes (which the
+# entrypoint currently forbids).  The rocm/jax-community base does not
+# include these; the official colabfold CUDA image does.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        kalign \
+        hhsuite \
+        mmseqs2 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install ColabFold on top of the ROCm JAX base.
 # The base image already provides jax[rocm]; we only add colabfold.
 # --no-deps prevents pip from pulling jax[cuda] as a dependency override.
@@ -47,7 +60,9 @@ RUN python -m pip install --no-cache-dir --no-deps \
     && python -c "import jax; print('jax', jax.__version__, 'backend', jax.default_backend())" \
     && python -c "from importlib.metadata import version; print('colabfold', version('colabfold'))"
 
-# Verify rocm-smi and JAX GPU devices
+# Verify rocm-smi and JAX GPU devices (may fail during build if no GPU;
+# || true keeps the build going — the runtime gpu-check subcommand will
+# enforce GPU on actual use)
 RUN rocm-smi --showproductname > /dev/null 2>&1 || true
 
 # Create non-root user (uid 10003; 10001 = lightdock, 10002 = colabfold-nvidia)

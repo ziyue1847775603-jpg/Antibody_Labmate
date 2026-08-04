@@ -24,7 +24,7 @@ def test_version_and_streamlit_deployment_contract(project_root: Path) -> None:
     config = tomllib.loads((project_root / ".streamlit" / "config.toml").read_text(encoding="utf-8"))
     requirements = (project_root / "requirements.txt").read_text(encoding="utf-8").splitlines()
 
-    assert __version__ == project_version() == pyproject["project"]["version"] == "0.4.0"
+    assert __version__ == project_version() == pyproject["project"]["version"] == "0.4.1"
     assert pyproject["project"]["requires-python"] == ">=3.11,<3.13"
     assert config["server"] == {
         "headless": True,

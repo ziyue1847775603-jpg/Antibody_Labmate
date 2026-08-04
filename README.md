@@ -18,7 +18,7 @@
 > multi-pose ordering is a Labmate-derived `global_tool_score_rank`, not a
 > LightDock-native global rank. See [`docs/benchmark_pilot_1ahw.md`](docs/benchmark_pilot_1ahw.md).
 
-> **v0.4.0 · REPLAY + VERIFIED LIVE LOCAL (HOST + DOCKER COMPOSE) + IMPLEMENTED-UNVERIFIED BENCHMARK LOCAL · NO LIVE REMOTE**
+> **v0.4.1-rc · REPLAY + VERIFIED LIVE LOCAL (HOST + DOCKER COMPOSE NVIDIA + DOCKER COMPOSE AMD/ROCm EXPERIMENTAL) + IMPLEMENTED-UNVERIFIED BENCHMARK LOCAL · NO LIVE REMOTE**
 
 本版本保留 Phase 1 Replay MVP，并新增 Phase 2a Live Local CLI。Replay 接受六条明确分开的 IMGT CDR 和抗原 PDB，验证输入后，只对与 `fixtures/demo_001` **精确匹配**的合成数据执行固定产物重放。运行时会重新完成 PDB 解析、界面几何分析、候选启发式排名、HTML 报告和 ZIP 打包。
 
