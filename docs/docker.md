@@ -119,6 +119,34 @@ docker compose -f docker-compose.live-local.yml build colabfold
 docker compose -f docker-compose.live-local.yml run --rm colabfold gpu-check
 ```
 
+### AMD/ROCm variant
+
+An AMD/ROCm ColabFold worker is provided for AMD GPU hosts.
+It uses the same Python adapter (`--docker-compose-file` switch), the
+same fixed scientific parameters, and the same LightDock CPU worker.
+The only difference is the compose file and the container image.
+
+- Compose: [`docker-compose.live-local-amd.yml`](../docker-compose.live-local-amd.yml)
+- Source: [`docker/live/colabfold-amd/Dockerfile`](../docker/live/colabfold-amd/Dockerfile)
+- Docs: [`docs/live_local_docker_d3_amd.md`](live_local_docker_d3_amd.md)
+- AMD hardware verification **pending** (implemented, not yet run on real AMD GPU)
+
+```bash
+docker compose -f docker-compose.live-local-amd.yml build colabfold
+docker compose -f docker-compose.live-local-amd.yml run --rm colabfold gpu-check
+```
+
+AMD hosts use `--docker-compose-file docker-compose.live-local-amd.yml`:
+```bash
+python -m labmate.cli run project.json --mode live_local \
+  --tool-execution-provider docker_compose \
+  --docker-compose-file docker-compose.live-local-amd.yml \
+  --docker-work-root runs/docker-live/work \
+  --docker-data-root /path/to/preinstalled-colabfold-models \
+  --docker-cache-root runs/docker-live/cache \
+  --output runs/docker-live/runs
+```
+
 ## Phase D4 — Docker Compose Live Local (end to end)
 
 Phase D4 verified the full chain with host Labmate orchestrator +

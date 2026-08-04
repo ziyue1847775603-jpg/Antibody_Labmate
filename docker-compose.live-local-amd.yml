@@ -1,0 +1,102 @@
+# Antibody Labmate — Live Local Docker Compose (AMD/ROCm) (Phase D3+)
+#
+# This file is separate from:
+#   - docker-compose.yml (Replay-only, unchanged)
+#   - docker-compose.live-local.yml (NVIDIA CUDA, unchanged)
+#
+# It adds AMD ROCm GPU support for the ColabFold worker.  The LightDock
+# CPU worker is identical to the NVIDIA variant.
+#
+# Required environment variables (set by the Labmate adapters; the :?
+# syntax fails closed if unset):
+#   LABMATE_DOCKER_WORK_ROOT        host dir for /work mounts
+#   LABMATE_COLABFOLD_DATA_ROOT     host dir with model weights -> /models/colabfold (ro)
+#   LABMATE_COLABFOLD_CACHE_ROOT    host dir for JAX compilation cache -> /work/cache (rw)
+#
+# ROCm devices are passed via `devices` and `group_add: video`.  The
+# host must have AMD ROCm drivers installed (/dev/kfd and /dev/dri
+# accessible).
+#
+# Usage:
+#   $ docker compose -f docker-compose.live-local-amd.yml build
+#   $ docker compose -f docker-compose.live-local-amd.yml run --rm colabfold version
+#   $ docker compose -f docker-compose.live-local-amd.yml run --rm colabfold gpu-check
+
+services:
+  colabfold:
+    build:
+      context: ./docker/live/colabfold-amd
+      dockerfile: Dockerfile
+    image: antibody-labmate-colabfold-amd:1.6.2
+    # No public ports — invoked on-demand via `docker compose run`
+    volumes:
+      # Input FASTA: read-only
+      - ${LABMATE_DOCKER_WORK_ROOT:?LABMATE_DOCKER_WORK_ROOT is required}/input:/work/input:ro
+      # Prediction output: read-write
+      - ${LABMATE_DOCKER_WORK_ROOT:?LABMATE_DOCKER_WORK_ROOT is required}/output:/work/output:rw
+      # Model weights: read-only, user-supplied
+      - ${LABMATE_COLABFOLD_DATA_ROOT:?LABMATE_COLABFOLD_DATA_ROOT is required}:/models/colabfold:ro
+      # JAX compilation cache: read-write, user-supplied
+      - ${LABMATE_COLABFOLD_CACHE_ROOT:?LABMATE_COLABFOLD_CACHE_ROOT is required}:/work/cache:rw
+    # ROCm GPU devices (AMD): /dev/kfd (Kernel Fusion Driver) and
+    # /dev/dri (Direct Rendering Infrastructure) are the AMD equivalent
+    # of NVIDIA's GPU passthrough.  No NVIDIA toolkit is needed.
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    group_add:
+      - video
+    # IPC host mode recommended for ROCm shared memory
+    ipc: host
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+    # No privileged mode, no Docker socket mount, no host network
+    privileged: false
+    # single_sequence mode needs no network at all
+    network_mode: none
+    # Read-only root filesystem; /tmp (tmpfs), /work/output and
+    # /work/cache (volumes) are writable
+    read_only: true
+    tmpfs:
+      - /tmp:size=4G,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=unconfined
+    restart: "no"
+    stdin_open: false
+    tty: false
+
+  lightdock:
+    build:
+      context: ./docker/live/lightdock
+      dockerfile: Dockerfile
+    image: antibody-labmate-lightdock:0.9.4
+    # No public ports — invoked on-demand via `docker compose run`
+    volumes:
+      # Shared work directory with explicit sub-directories.
+      # Both are read-write because LightDock's setup step writes
+      # processed PDBs back into the inputs directory.
+      - ${LABMATE_DOCKER_WORK_ROOT:?LABMATE_DOCKER_WORK_ROOT is required}/inputs:/work/inputs:rw
+      - ${LABMATE_DOCKER_WORK_ROOT:?LABMATE_DOCKER_WORK_ROOT is required}/outputs:/work/outputs:rw
+    # CPU-only worker; no GPU reservation
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    privileged: false
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=256M,mode=1777
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    stdin_open: false
+    tty: false
